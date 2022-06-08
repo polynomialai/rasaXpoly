@@ -1407,18 +1407,18 @@ def create_app(
         name_of_intent = data['displayName']
         examples = [example['parts'][0]['text'] for example in data['trainingPhrases']]
         app.config.nlu.create_intent(name_of_intent,examples)
-        print(app.config.nlu.data())
+        # print(app.config.nlu.data())
         return response.text("I got it")
     
-    @app.post("/add_entity")
-    def add_entity(request:Request)->None:
-        # print("Receiving")
-        data = request.json
-        name_of_intent = data['displayName']
-        examples = [example['parts'][0]['text'] for example in data['trainingPhrases']]
-        app.config.nlu.create_intent(name_of_intent,examples)
-        print(app.config.nlu.data())
-        return response.text("I got it")
+    # @app.post("/add_entity")
+    # def add_entity(request:Request)->None:
+    #     # print("Receiving")
+    #     data = request.json
+    #     name_of_intent = data['displayName']
+    #     examples = [example['parts'][0]['text'] for example in data['trainingPhrases']]
+    #     app.config.nlu.create_intent(name_of_intent,examples)
+    #     print(app.config.nlu.data())
+    #     return response.text("I got it")
     
 
     @app.get("/get_examples")
@@ -1426,7 +1426,17 @@ def create_app(
         data = app.config.nlu.data()
         return response.json(data)
 
-        
+    @app.post("/add_synonyms")
+    def add_synonyms(request:Request)->HTTPResponse:
+        synonym_name = request.json['synonym_name']
+        synonyms = request.json['synonyms']
+        app.config.nlu.add_synonyms(synonym_name,synonyms)
+        return response.text("I got it")
+    
+    @app.post("/add_regex")
+    def add_regex(request:Request)->HTTPResponse:
+        return text("Yet to be done")
+
     return app
 
 
@@ -1482,28 +1492,28 @@ def _test_data_file_from_payload(request: Request, temporary_directory: Path) ->
 
 
 def _training_payload_from_yaml(
-    request: Request, temp_dir: Path, file_name: Text = "data.yml"
+    yaml_data, temp_dir: Path, file_name: Text = "data.yml"
 ) -> Dict[Text, Any]:
     logger.debug("Extracting YAML training data from request body.")
 
-    decoded = request.body.decode(rasa.shared.utils.io.DEFAULT_ENCODING)
-    _validate_yaml_training_payload(decoded)
+    # decoded = request.body.decode(rasa.shared.utils.io.DEFAULT_ENCODING)
+    _validate_yaml_training_payload(yaml_data)
 
     training_data = temp_dir / file_name
-    rasa.shared.utils.io.write_text_file(decoded, training_data)
+    rasa.shared.utils.io.write_text_file(yaml_data, training_data)
 
     model_output_directory = str(temp_dir)
-    if rasa.utils.endpoints.bool_arg(request, "save_to_default_model_directory", True):
-        model_output_directory = DEFAULT_MODELS_PATH
-
+    # if rasa.utils.endpoints.bool_arg(request, "save_to_default_model_directory", True):
+    model_output_directory = DEFAULT_MODELS_PATH
+    # print(str(training_data))
     return dict(
         domain=str(training_data),
         config=str(training_data),
         training_files=str(temp_dir),
         output=model_output_directory,
-        force_training=rasa.utils.endpoints.bool_arg(request, "force_training", False),
-        core_additional_arguments=_extract_core_additional_arguments(request),
-        nlu_additional_arguments=_extract_nlu_additional_arguments(request),
+        # force_training=rasa.utils.endpoints.bool_arg(request, "force_training", False),
+        # core_additional_arguments=_extract_core_additional_arguments(request),
+        # nlu_additional_arguments=_extract_nlu_additional_arguments(request),
     )
 
 
