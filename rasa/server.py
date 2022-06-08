@@ -23,6 +23,7 @@ from typing import (
     NoReturn,
     Coroutine,
 )
+import yaml
 
 import aiohttp
 import jsonschema
@@ -76,6 +77,7 @@ import rasa.nlu.test
 from rasa.nlu.test import CVEvaluationResult
 from rasa.shared.utils.schemas.events import EVENTS_SCHEMA
 from rasa.utils.endpoints import EndpointConfig
+from rasa.format.format import nlu_format
 
 if TYPE_CHECKING:
     from ssl import SSLContext  # noqa: F401
@@ -675,7 +677,7 @@ def create_app(
             algorithm=jwt_method,
             user_id="username",
         )
-
+    app.config.nlu = nlu_format()
     app.ctx.agent = agent
     # Initialize shared object of type unsigned int for tracking
     # the number of active training processes
@@ -1047,13 +1049,13 @@ def create_app(
     @run_in_thread
     @inject_temp_dir
     async def train(request: Request, temporary_directory: Path) -> HTTPResponse:
-        validate_request_body(
-            request,
-            "You must provide training data in the request body in order to "
-            "train your model.",
-        )
+        # validate_request_body(
+        #     request,
+        #     "You must provide training data in the request body in order to "
+        #     "train your model.",
+        # )
 
-        training_payload = _training_payload_from_yaml(request, temporary_directory)
+        training_payload = _training_payload_from_yaml(yaml.dump(app.config.nlu.data()), temporary_directory)
 
         try:
             with app.ctx.active_training_processes.get_lock():
