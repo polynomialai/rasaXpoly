@@ -1398,7 +1398,33 @@ def create_app(
                 f"Make sure you've set the appropriate Accept "
                 f"header.",
             )
+    @app.post("/add_intent")
+    def add_intent(request:Request)->None:
+        # print("Receiving")
+        data = request.json
+        name_of_intent = data['displayName']
+        examples = [example['parts'][0]['text'] for example in data['trainingPhrases']]
+        app.config.nlu.create_intent(name_of_intent,examples)
+        print(app.config.nlu.data())
+        return response.text("I got it")
+    
+    @app.post("/add_entity")
+    def add_entity(request:Request)->None:
+        # print("Receiving")
+        data = request.json
+        name_of_intent = data['displayName']
+        examples = [example['parts'][0]['text'] for example in data['trainingPhrases']]
+        app.config.nlu.create_intent(name_of_intent,examples)
+        print(app.config.nlu.data())
+        return response.text("I got it")
+    
 
+    @app.get("/get_examples")
+    def get_exmaples(request:Request)->HTTPResponse:
+        data = app.config.nlu.data()
+        return response.json(data)
+
+        
     return app
 
 
