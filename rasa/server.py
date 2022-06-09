@@ -1420,7 +1420,7 @@ def create_app(
     #     print(app.config.nlu.data())
     #     return response.text("I got it")
     
-
+    #
     @app.get("/get_examples")
     def get_exmaples(request:Request)->HTTPResponse:
         data = app.config.nlu.data()
