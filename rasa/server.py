@@ -1409,6 +1409,16 @@ def create_app(
         app.config.nlu.create_intent(name_of_intent,examples)
         # print(app.config.nlu.data())
         return response.text("I got it")
+
+    @app.post("/add_regex")
+    def add_regex(request:Request)->None:
+        # print("Receiving")
+        data = request.json
+        name_of_regex = data['displayName']
+        examples = [example['parts'][0]['text'] for example in data['trainingPhrases']]
+        app.config.nlu.create_regex(name_of_regex,examples)
+        # print(app.config.nlu.data())
+        return response.text("I got it")
     
     # @app.post("/add_entity")
     # def add_entity(request:Request)->None:
