@@ -1435,7 +1435,7 @@ def create_app(
     
     @app.post("/add_regex")
     def add_regex(request:Request)->HTTPResponse:
-        return text("Yet to be done")
+        return response.text("Yet to be done")
 
     return app
 
