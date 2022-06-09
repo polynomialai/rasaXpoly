@@ -137,6 +137,11 @@ class nlu_format:
         }
         self.format['nlu'].append(dic)
 
+        # Annotate all the examples again 
+        for i in range(len(self.format['nlu'])):
+          if 'intent' in self.format['nlu'][i].keys():
+            self.format['nlu'][i]['examples'] = [self.annotate(example) for example in self.get_examples(self.format['nlu'][i],"intent")]
+
     def add_entity(self,entities):
         dic = {   
                 "entities": "- ".join([entity+"\n" for entity in entities ])

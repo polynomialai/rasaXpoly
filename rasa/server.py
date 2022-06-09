@@ -678,6 +678,7 @@ def create_app(
             user_id="username",
         )
     app.config.nlu = nlu_format()
+    app.config.nlu.load_nlu(filename="./config.json")
     app.ctx.agent = agent
     # Initialize shared object of type unsigned int for tracking
     # the number of active training processes
@@ -1407,19 +1408,8 @@ def create_app(
         name_of_intent = data['displayName']
         examples = [example['parts'][0]['text'] for example in data['trainingPhrases']]
         app.config.nlu.create_intent(name_of_intent,examples)
-        # print(app.config.nlu.data())
+        app.config.nlu.save_nlu()
         return response.text("I got it")
-    
-    # @app.post("/add_entity")
-    # def add_entity(request:Request)->None:
-    #     # print("Receiving")
-    #     data = request.json
-    #     name_of_intent = data['displayName']
-    #     examples = [example['parts'][0]['text'] for example in data['trainingPhrases']]
-    #     app.config.nlu.create_intent(name_of_intent,examples)
-    #     print(app.config.nlu.data())
-    #     return response.text("I got it")
-    
 
     @app.get("/get_examples")
     def get_exmaples(request:Request)->HTTPResponse:
@@ -1431,8 +1421,14 @@ def create_app(
         synonym_name = request.json['synonym_name']
         synonyms = request.json['synonyms']
         app.config.nlu.add_synonyms(synonym_name,synonyms)
+        app.config.nlu.save_nlu()
         return response.text("I got it")
-    
+
+    @app.post("/delete_intent")
+    def delete_intent(request:Request)->None:
+        intent = request.json['intent']
+        
+
     @app.post("/add_regex")
     def add_regex(request:Request)->HTTPResponse:
         return text("Yet to be done")
