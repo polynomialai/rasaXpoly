@@ -1,6 +1,6 @@
 import json
 import datetime
-from rasa.format.annotator import annotate_example
+from rasa.format.annotator import annotate_example, add_regex_annotation
 class nlu_format:
     def __init__(self) -> None:
         self.format = {
@@ -122,6 +122,18 @@ class nlu_format:
         return example
     def list_intent(self):
         return self.format["nlu"]
+
+    # def regex_annotate(self,example):
+    #     for regex in self.format['entities']:
+    #       print("Entity is ",entity,"\n")
+    #       for synonym in self.get_examples(entity,"synonym"):
+    #         print("Synonym is ",synonym,"\n")
+    #         if synonym in example:
+    #           return add_regex_annotation(example, synonym , entity, synonym)
+    #     return example
+    # def list_intent(self):
+    #     return self.format["nlu"]
+
     
     def add_synonyms(self,synonym_name,synonyms):
         if synonym_name in self.format["entities"]:
@@ -134,6 +146,21 @@ class nlu_format:
         dic = {
             "synonym":synonym_name,
             "examples": "- "+"- ".join([synonym+"\n" for synonym in synonyms])
+        }
+        self.format['nlu'].append(dic)
+    
+    def create_regex(self,regex_intent,examples=None):
+        if regex_intent in self.format["regex"]:
+            for i in range(len(self.format['nlu'])):
+                if 'regex' in  self.format['nlu'][i].keys():
+                    if self.format['nlu'][i]['regex']== regex_intent:
+                        self.format["nlu"][i]["examples"] = self.format["nlu"][i]["examples"] + "- ".join([example +"\n" for example in examples])
+                        return
+
+        self.format['regex'].append(regex_intent) 
+        dic = {
+            "intent":regex_intent,
+            "examples": "- "+"- ".join([example+"\n" for example in examples])
         }
         self.format['nlu'].append(dic)
 
