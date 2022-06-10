@@ -678,7 +678,7 @@ def create_app(
             user_id="username",
         )
     app.config.nlu = nlu_format()
-    app.config.nlu.load_nlu(filename="./config.json")
+    app.config.nlu.load_nlu(filename="config.json")
     app.ctx.agent = agent
     # Initialize shared object of type unsigned int for tracking
     # the number of active training processes
@@ -1069,11 +1069,19 @@ def create_app(
 
             if training_result.model:
                 filename = os.path.basename(training_result.model)
+                new_agent = await _load_agent(os.path.abspath(training_result.model))
+                new_agent.lock_store = app.ctx.agent.lock_store
+                app.ctx.agent = new_agent
 
-                return await response.file(
-                    training_result.model,
-                    filename=filename,
-                    headers={"filename": filename},
+                return response.json(
+                    # training_result.model,
+                    body={"name":filename,
+                          "done":True,
+                          "metadata":{
+                            "filename":filename
+                          }
+                          }
+                    # headers={"filename": filename},
                 )
             else:
                 raise ErrorResponse(
@@ -1430,8 +1438,14 @@ def create_app(
         
 
     @app.post("/add_regex")
-    def add_regex(request:Request)->HTTPResponse:
-        return text("Yet to be done")
+    def add_regex(request:Request)->None:
+        # print("Receiving")
+        data = request.json
+        name_of_regex = data['displayName']
+        examples = [example['parts'][0]['text'] for example in data['trainingPhrases']]
+        app.config.nlu.create_regex(name_of_regex,examples)
+        # print(app.config.nlu.data())
+        return response.text("I got it")
 
     return app
 
