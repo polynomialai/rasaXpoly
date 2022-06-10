@@ -6,7 +6,7 @@ def annotate_example(example : str, token : str,  entity : str, synonym: str) ->
     return example
 
 def add_regex_annotation(example : str, token : str, regex_entity : str) -> str:    
-
+    print("Here")
     example = example.replace(token, f"[{token}]" )+ f"({regex_entity})"
 
     return example
