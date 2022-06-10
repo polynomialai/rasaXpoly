@@ -91,11 +91,11 @@ class nlu_format:
         return self.format
 
     def save_nlu(self):
-        with open(f'../data/temp/{str(datetime.datetime.now())}.json', 'w') as fp:
+        with open(f'config.json', 'w') as fp:
             json.dump(self.format, fp)
 
     def load_nlu(self,filename):
-        with open(f'../data/temp/{filename}.json') as json_file:
+        with open(f'config.json') as json_file:
             self.format = json.load(json_file)
 
     def create_intent(self,intent,examples=None):
@@ -103,7 +103,7 @@ class nlu_format:
             for i in range(len(self.format['nlu'])):
                 if 'intent' in  self.format['nlu'][i].keys():
                     if self.format['nlu'][i]['intent']== intent:
-                        self.format["nlu"][i]["examples"] = self.format["nlu"][i]["examples"] + "- ".join([self.annotate(example) +"\n" for example in examples])
+                        self.format["nlu"][i]["examples"] = self.format["nlu"][i]["examples"] + "- ".join([self.annotate(example) +"\n" for example in examples if self.annotate(example) not in self.format["nlu"][i]["examples"]])
                         return
 
         self.format['intents'].append(intent) 
@@ -119,10 +119,19 @@ class nlu_format:
           if i[_type]==value:
             examples = i['examples']
             examples = "\n"+examples 
-            examples = examples.split("\n-")
-            examples = (" ".join(examples)).split()
-            return examples
+            examples = examples.replace("\n-", ",")
+            examples = ("".join(examples))
 
+<<<<<<< HEAD
+            examples = examples.split(",")
+            ###  removing empty strings and \n in the examples
+            examples.remove('')
+            for _exp_idx in range(len(examples)):
+                examples[_exp_idx] = examples[_exp_idx].replace('\n','').strip()
+            return examples
+       
+    def annotate(self,example):
+=======
     def list_regex_example(self, regex_entity):
       for r in self.format["nlu"]:
         if "regex" in r.keys():
@@ -141,10 +150,9 @@ class nlu_format:
 
     def annotate(self,example, type="synonym"):
       if type == "entity":
+>>>>>>> 94f51a0d971cd0891850026abcedb68a5af87e5c
         for entity in self.format['entities']:
-          print("Entity is ",entity,"\n")
           for synonym in self.get_examples(entity,"synonym"):
-            print("Synonym is ",synonym,"\n")
             if synonym in example:
               return annotate_example(example, synonym , entity, synonym)
         return example
@@ -172,7 +180,7 @@ class nlu_format:
             for i in range(len(self.format['nlu'])):
                 if 'synonym' in  self.format['nlu'][i].keys():
                     if self.format['nlu'][i]['synonym']== synonym_name:
-                        self.format["nlu"][i]["examples"] = self.format["nlu"][i]["examples"] + "- ".join([synonym+"\n" for synonym in synonyms])
+                        self.format["nlu"][i]["examples"] = self.format["nlu"][i]["examples"] + "- ".join([synonym+"\n" for synonym in synonyms if synonym not in self.format["nlu"][i]["examples"]])
                         return
         self.format['entities'].append(synonym_name) 
         dic = {
@@ -194,6 +202,11 @@ class nlu_format:
           "examples": "- "+"- ".join([example+"\n" for example in examples])
       }
       self.format['nlu'].append(dic)
+
+        # Annotate all the examples again 
+        for i in range(len(self.format['nlu'])):
+          if 'intent' in self.format['nlu'][i].keys():
+            self.format['nlu'][i]['examples'] = '- '+"\n- ".join([self.annotate(example) for example in self.get_examples(self.format['nlu'][i]['intent'],"intent")])
 
     def add_entity(self,entities):
         dic = {   

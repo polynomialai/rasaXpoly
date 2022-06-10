@@ -678,6 +678,7 @@ def create_app(
             user_id="username",
         )
     app.config.nlu = nlu_format()
+    app.config.nlu.load_nlu(filename="config.json")
     app.ctx.agent = agent
     # Initialize shared object of type unsigned int for tracking
     # the number of active training processes
@@ -1068,11 +1069,19 @@ def create_app(
 
             if training_result.model:
                 filename = os.path.basename(training_result.model)
+                new_agent = await _load_agent(os.path.abspath(training_result.model))
+                new_agent.lock_store = app.ctx.agent.lock_store
+                app.ctx.agent = new_agent
 
-                return await response.file(
-                    training_result.model,
-                    filename=filename,
-                    headers={"filename": filename},
+                return response.json(
+                    # training_result.model,
+                    body={"name":filename,
+                          "done":True,
+                          "metadata":{
+                            "filename":filename
+                          }
+                          }
+                    # headers={"filename": filename},
                 )
             else:
                 raise ErrorResponse(
@@ -1407,9 +1416,11 @@ def create_app(
         name_of_intent = data['displayName']
         examples = [example['parts'][0]['text'] for example in data['trainingPhrases']]
         app.config.nlu.create_intent(name_of_intent,examples)
-        # print(app.config.nlu.data())
+        app.config.nlu.save_nlu()
         return response.text("I got it")
 
+<<<<<<< HEAD
+=======
     @app.post("/add_regex")
     def add_regex(request:Request)->None:
         # print("Receiving")
@@ -1431,6 +1442,7 @@ def create_app(
     #     return response.text("I got it")
     
     #
+>>>>>>> 94f51a0d971cd0891850026abcedb68a5af87e5c
     @app.get("/get_examples")
     def get_exmaples(request:Request)->HTTPResponse:
         data = app.config.nlu.data()
@@ -1441,7 +1453,26 @@ def create_app(
         synonym_name = request.json['synonym_name']
         synonyms = request.json['synonyms']
         app.config.nlu.add_synonyms(synonym_name,synonyms)
+        app.config.nlu.save_nlu()
         return response.text("I got it")
+<<<<<<< HEAD
+
+    @app.post("/delete_intent")
+    def delete_intent(request:Request)->None:
+        intent = request.json['intent']
+        
+
+    @app.post("/add_regex")
+    def add_regex(request:Request)->None:
+        # print("Receiving")
+        data = request.json
+        name_of_regex = data['displayName']
+        examples = [example['parts'][0]['text'] for example in data['trainingPhrases']]
+        app.config.nlu.create_regex(name_of_regex,examples)
+        # print(app.config.nlu.data())
+        return response.text("I got it")
+=======
+>>>>>>> 94f51a0d971cd0891850026abcedb68a5af87e5c
 
     return app
 
