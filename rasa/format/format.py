@@ -199,6 +199,7 @@ class nlu_format:
             "examples": "- "+"- ".join([synonym+"\n" for synonym in synonyms])
         }
         self.format['nlu'].append(dic)
+<<<<<<< HEAD
 
         # Annotate all the examples again 
         for i in range(len(self.format['nlu'])):
@@ -217,6 +218,22 @@ class nlu_format:
             "examples": "- "+"- ".join([synonym+"\n" for synonym in synonyms])
         }
         self.format['nlu'].append(dic)
+=======
+      
+    def create_regex(self,regex_intent,examples=None):
+      for i in range(len(self.format['nlu'])):
+          if 'regex' in  self.format['nlu'][i].keys():
+              if self.format['nlu'][i]['regex']== regex_intent:
+                  self.format["nlu"][i]["examples"] = self.format["nlu"][i]["examples"] + "- ".join([example +"\n" for example in examples])
+                  return
+
+      
+      dic = {
+          "regex":regex_intent,
+          "examples": "- "+"- ".join([example+"\n" for example in examples])
+      }
+      self.format['nlu'].append(dic)
+>>>>>>> 88f79fbee353174a91f7e06bbbeabd4a2a5387fa
 
         # Annotate all the examples again 
         for i in range(len(self.format['nlu'])):
