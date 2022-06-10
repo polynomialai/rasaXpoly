@@ -1419,6 +1419,30 @@ def create_app(
         app.config.nlu.save_nlu()
         return response.text("I got it")
 
+<<<<<<< HEAD
+=======
+    @app.post("/add_regex")
+    def add_regex(request:Request)->None:
+        # print("Receiving")
+        data = request.json
+        name_of_regex = data['displayName']
+        examples = [example['parts'][0]['text'] for example in data['trainingPhrases']]
+        app.config.nlu.create_regex(name_of_regex,examples)
+        # print(app.config.nlu.data())
+        return response.text("I got it")
+    
+    # @app.post("/add_entity")
+    # def add_entity(request:Request)->None:
+    #     # print("Receiving")
+    #     data = request.json
+    #     name_of_intent = data['displayName']
+    #     examples = [example['parts'][0]['text'] for example in data['trainingPhrases']]
+    #     app.config.nlu.create_intent(name_of_intent,examples)
+    #     print(app.config.nlu.data())
+    #     return response.text("I got it")
+    
+    #
+>>>>>>> 94f51a0d971cd0891850026abcedb68a5af87e5c
     @app.get("/get_examples")
     def get_exmaples(request:Request)->HTTPResponse:
         data = app.config.nlu.data()
@@ -1431,6 +1455,7 @@ def create_app(
         app.config.nlu.add_synonyms(synonym_name,synonyms)
         app.config.nlu.save_nlu()
         return response.text("I got it")
+<<<<<<< HEAD
 
     @app.post("/delete_intent")
     def delete_intent(request:Request)->None:
@@ -1446,6 +1471,8 @@ def create_app(
         app.config.nlu.create_regex(name_of_regex,examples)
         # print(app.config.nlu.data())
         return response.text("I got it")
+=======
+>>>>>>> 94f51a0d971cd0891850026abcedb68a5af87e5c
 
     return app
 

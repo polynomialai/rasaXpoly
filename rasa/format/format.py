@@ -1,6 +1,9 @@
 import json
 import datetime
-from rasa.format.annotator import annotate_example
+
+from matplotlib.pyplot import annotate
+from rasa.format.annotator import annotate_example, add_regex_annotation
+import regex as re
 class nlu_format:
     def __init__(self) -> None:
         self.format = {
@@ -71,7 +74,15 @@ class nlu_format:
                                 {
                                     "intent": "goodbye",
                                     "examples": "- bye\n- goodbye\n"
-                                }
+                                },
+                                {
+                                    "regex": "account_number",
+                                    "examples": "- \d{10,12}\n- \d{10,11}\n"
+                                },          
+                                {
+                                    "intent": "inform",
+                                    "examples": "- my account number is [1234567891](account_number)\n- This is my account number [1234567891](account_number)"
+                                }        
                             ],
                             "rules": [],
                             "stories": []
@@ -111,6 +122,7 @@ class nlu_format:
             examples = examples.replace("\n-", ",")
             examples = ("".join(examples))
 
+<<<<<<< HEAD
             examples = examples.split(",")
             ###  removing empty strings and \n in the examples
             examples.remove('')
@@ -119,14 +131,50 @@ class nlu_format:
             return examples
        
     def annotate(self,example):
+=======
+    def list_regex_example(self, regex_entity):
+      for r in self.format["nlu"]:
+        if "regex" in r.keys():
+          examples = r["examples"]
+          examples = "\n"+examples
+          examples = examples.replace("\n-", ",")
+          examples = ("".join(examples))
+
+          examples = examples.split(",")
+          ###  removing empty strings and \n in the examples
+          examples.remove('')
+          for _exp_idx in range(len(examples)):
+              examples[_exp_idx] = examples[_exp_idx].replace('\n','')
+
+          return examples
+
+    def annotate(self,example, type="synonym"):
+      if type == "entity":
+>>>>>>> 94f51a0d971cd0891850026abcedb68a5af87e5c
         for entity in self.format['entities']:
           for synonym in self.get_examples(entity,"synonym"):
             if synonym in example:
               return annotate_example(example, synonym , entity, synonym)
         return example
+
+      if type == "regex":
+        regex_list = []
+        for r in self.format['nlu']:
+          if "regex" in r.keys():
+            regex_list.append(r["regex"])
+
+        
+        for reg in regex_list:
+          regex_example_list = self.list_regex_example(regex_entity=reg)
+          for reg_code in regex_example_list:
+            regex_search = re.search(reg_code, example)
+            if regex_search is not None:
+              return add_regex_annotation(example,regex_search.group(), reg )
+        return example
+        
     def list_intent(self):
-        return self.format["nlu"]
-    
+         return self.format["nlu"]
+  
     def add_synonyms(self,synonym_name,synonyms):
         if synonym_name in self.format["entities"]:
             for i in range(len(self.format['nlu'])):
@@ -138,6 +186,21 @@ class nlu_format:
         dic = {
             "synonym":synonym_name,
             "examples": "- "+"- ".join([synonym+"\n" for synonym in synonyms])
+        }
+        self.format['nlu'].append(dic)
+    
+    def create_regex(self,regex_intent,examples=None):
+        if regex_intent in self.format["regex"]:
+            for i in range(len(self.format['nlu'])):
+                if 'regex' in  self.format['nlu'][i].keys():
+                    if self.format['nlu'][i]['regex']== regex_intent:
+                        self.format["nlu"][i]["examples"] = self.format["nlu"][i]["examples"] + "- ".join([example +"\n" for example in examples])
+                        return
+
+        self.format['regex'].append(regex_intent) 
+        dic = {
+            "intent":regex_intent,
+            "examples": "- "+"- ".join([example+"\n" for example in examples])
         }
         self.format['nlu'].append(dic)
 
