@@ -1,6 +1,9 @@
 import json
 import datetime
+
+from matplotlib.pyplot import annotate
 from rasa.format.annotator import annotate_example, add_regex_annotation
+import regex as re
 class nlu_format:
     def __init__(self) -> None:
         self.format = {
@@ -71,7 +74,15 @@ class nlu_format:
                                 {
                                     "intent": "goodbye",
                                     "examples": "- bye\n- goodbye\n"
-                                }
+                                },
+                                {
+                                    "regex": "account_number",
+                                    "examples": "- \d{10,12}\n- \d{10,11}\n"
+                                },          
+                                {
+                                    "intent": "inform",
+                                    "examples": "- my account number is [1234567891](account_number)\n- This is my account number [1234567891](account_number)"
+                                }        
                             ],
                             "rules": [],
                             "stories": []
@@ -112,7 +123,24 @@ class nlu_format:
             examples = (" ".join(examples)).split()
             return examples
 
-    def annotate(self,example):
+    def list_regex_example(self, regex_entity):
+      for r in self.format["nlu"]:
+        if "regex" in r.keys():
+          examples = r["examples"]
+          examples = "\n"+examples
+          examples = examples.replace("\n-", ",")
+          examples = ("".join(examples))
+
+          examples = examples.split(",")
+          ###  removing empty strings and \n in the examples
+          examples.remove('')
+          for _exp_idx in range(len(examples)):
+              examples[_exp_idx] = examples[_exp_idx].replace('\n','')
+
+          return examples
+
+    def annotate(self,example, type="synonym"):
+      if type == "entity":
         for entity in self.format['entities']:
           print("Entity is ",entity,"\n")
           for synonym in self.get_examples(entity,"synonym"):
@@ -120,21 +148,25 @@ class nlu_format:
             if synonym in example:
               return annotate_example(example, synonym , entity, synonym)
         return example
+
+      if type == "regex":
+        regex_list = []
+        for r in self.format['nlu']:
+          if "regex" in r.keys():
+            regex_list.append(r["regex"])
+
+        
+        for reg in regex_list:
+          regex_example_list = self.list_regex_example(regex_entity=reg)
+          for reg_code in regex_example_list:
+            regex_search = re.search(reg_code, example)
+            if regex_search is not None:
+              return add_regex_annotation(example,regex_search.group(), reg )
+        return example
+        
     def list_intent(self):
-        return self.format["nlu"]
-
-    # def regex_annotate(self,example):
-    #     for regex in self.format['entities']:
-    #       print("Entity is ",entity,"\n")
-    #       for synonym in self.get_examples(entity,"synonym"):
-    #         print("Synonym is ",synonym,"\n")
-    #         if synonym in example:
-    #           return add_regex_annotation(example, synonym , entity, synonym)
-    #     return example
-    # def list_intent(self):
-    #     return self.format["nlu"]
-
-    
+         return self.format["nlu"]
+  
     def add_synonyms(self,synonym_name,synonyms):
         if synonym_name in self.format["entities"]:
             for i in range(len(self.format['nlu'])):
