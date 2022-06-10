@@ -1442,10 +1442,6 @@ def create_app(
         synonyms = request.json['synonyms']
         app.config.nlu.add_synonyms(synonym_name,synonyms)
         return response.text("I got it")
-    
-    @app.post("/add_regex")
-    def add_regex(request:Request)->HTTPResponse:
-        return response.text("Yet to be done")
 
     return app
 
