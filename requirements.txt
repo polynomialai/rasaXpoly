@@ -46,7 +46,7 @@ dnspython
 docopt==0.6.2
 docspec
 docspec-python
-en-core-web-sm
+en
 execnet
 fakeredis
 fbmessenger
