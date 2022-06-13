@@ -212,9 +212,9 @@ class nlu_format:
         self.format["domain"].push(dic)
 
     def del_entity(self,entity):
-        for i in self.format["domain"]:
+        for i in self.format["nlu"]:
             if i["entities"] == "- "+ entity:
-                self.format["domain"].remove(i) 
+                self.format["nlu"].remove(i) 
                     
     def remove_entity_annotation(entity_name:str, example:str):
         
@@ -230,11 +230,7 @@ class nlu_format:
             return example
 
     def delete_entity(self,entity_name: str):
-      #check in the domain first
-      for i in self.format["domain"]:
-            if i["entities"] == "- "+ entity_name:
-                self.format["domain"].remove(i) 
-
+      #check in the domain first 
       for data in self.format["nlu"]:
         if "intent" in data.keys():
           if entity_name in data["examples"]:

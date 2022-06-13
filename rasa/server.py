@@ -1411,13 +1411,15 @@ def create_app(
             )
     @app.post("/add_intent")
     def add_intent(request:Request)->None:
-        # print("Receiving")
         data = request.json
         name_of_intent = data['displayName']
         examples = [example['parts'][0]['text'] for example in data['trainingPhrases']]
         app.config.nlu.create_intent(name_of_intent,examples)
         app.config.nlu.save_nlu()
-        return response.text("I got it")
+        return response.json({
+            "displayName":data['displayName']
+        })
+
     @app.post("/clean_nlu")
     def clean_nlu(request:Request)->HTTPResponse:
         app.config.nlu.purge_nlu()
@@ -1425,25 +1427,11 @@ def create_app(
         
     @app.post("/add_regex")
     def add_regex(request:Request)->HTTPResponse:
-        # print("Receiving")
         data = request.json
         name_of_regex = data['displayName']
-        # examples = [example['parts'][0]['text'] for example in data['trainingPhrases']]
         examples = request.json['synonyms']
         app.config.nlu.create_regex(name_of_regex,examples)
-        # print(app.config.nlu.data())
         return response.text("I got it")
-    
-    # @app.post("/add_entity")
-    # def add_entity(request:Request)->None:
-    #     # print("Receiving")
-    #     data = request.json
-    #     name_of_intent = data['displayName']
-    #     examples = [example['parts'][0]['text'] for example in data['trainingPhrases']]
-    #     app.config.nlu.create_intent(name_of_intent,examples)
-    #     print(app.config.nlu.data())
-    #     return response.text("I got it")
-    
     
     @app.post("/add_entity")
     def add_entity(request:Request)->None:
@@ -1477,6 +1465,11 @@ def create_app(
         app.config.nlu.add_synonyms(synonym_name,synonyms)
         app.config.nlu.save_nlu()
         return response.text("I got it")
+    
+    @app.delete("/delete_entity/<entity_name>")
+    def delete_entity(request:Request,entity_name)->HTTPResponse:
+        app.config.nlu.delete_entity(entity_name)
+        return response.json({})
 
     return app
 
