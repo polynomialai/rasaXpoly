@@ -216,7 +216,7 @@ class nlu_format:
             if i["entities"] == "- "+ entity:
                 self.format["nlu"].remove(i) 
                     
-    def remove_entity_annotation(entity_name:str, example:str):
+    def remove_entity_annotation(self,entity_name:str, example:str):
         
     # expecting example as: how much do I have on my [credit card account]{"entity": "account", "value": "credit"}
     # 
@@ -243,14 +243,14 @@ class nlu_format:
 
     def delete_entity(self,entity_name: str):
       #check in the domain first 
+      self.format['entites'] = [entity for entity in self.format['entites'] if entity!=entity_name]
       for data in self.format["nlu"]:
         if "intent" in data.keys():
           examples_list = self.get_examples(data["intent"],"intent")
           for example in range(len(examples_list)):
             if entity_name in examples_list[example]:
               examples_list[example] = self.remove_entity_annotation(entity_name, examples_list[example])
-          data["example"] = "- " + "\n- ".join([_example for _example in examples_list])
-          
+          data["examples"] = "- " + "\n- ".join([_example for _example in examples_list])
 
 
     def delete_regex(self,regex_name: str):
@@ -261,5 +261,5 @@ class nlu_format:
           for example in range(len(examples_list)):
             if regex_name in examples_list[example]:
               examples_list[example] = self.remove_regex_annotation(regex_name, examples_list[example])
-          data["example"] = "- " + "\n- ".join([_example for _example in examples_list])
-        
+          data["examples"] = "- " + "\n- ".join([_example for _example in examples_list])
+      # self.format['nlu']['entites'] = [entity for entity in format['nlu']['entites'] if entity!=entity_name]  
