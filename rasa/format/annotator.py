@@ -8,6 +8,3 @@ def add_regex_annotation(example : str, token : str, regex_entity : str) -> str:
 
     return example
 
-print(add_regex_annotation("I am a boy","boy","gender"))
-
-
