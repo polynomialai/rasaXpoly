@@ -1444,7 +1444,27 @@ def create_app(
     #     print(app.config.nlu.data())
     #     return response.text("I got it")
     
-    #
+    
+    @app.post("/add_entity")
+    def add_entity(request:Request)->None:
+        data = request.json
+        _type = data['kind']
+        if _type=="regex":
+            for i in data['entities']:
+                name_of_regex = i['value']
+                examples = i['synonyms']
+                app.config.nlu.create_regex(name_of_regex,examples)
+            app.config.nlu.save_nlu()
+        
+        if _type=="synonym":
+            for i in data['entities']:
+                synonym_name = i['value']
+                synonyms = i['synonyms']
+                app.config.nlu.add_synonyms(synonym_name,synonyms)
+                app.config.nlu.save_nlu()
+
+        return response.json(data)
+
     @app.get("/get_examples")
     def get_exmaples(request:Request)->HTTPResponse:
         data = app.config.nlu.data()
