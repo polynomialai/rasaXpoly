@@ -1468,7 +1468,17 @@ def create_app(
     
     @app.delete("/delete_entity/<entity_name>")
     def delete_entity(request:Request,entity_name)->HTTPResponse:
-        app.config.nlu.delete_entity(entity_name)
+        for i in self.config.nlu['format']['nlu']:
+            if 'synonym' in i.keys():
+                if i['synonym']==entity_name:
+                    app.config.nlu.delete_entity(entity_name)
+                    del i
+                    return response.json({})
+            if 'regex' in i.keys():
+                if i['regex']==entity_name:
+                    app.config.nlu.delete_regex(regex_name)
+                    del i
+                    return response.json({})
         return response.json({})
 
     return app
