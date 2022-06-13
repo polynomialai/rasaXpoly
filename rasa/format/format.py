@@ -204,25 +204,6 @@ class nlu_format:
         for i in range(len(self.format['nlu'])):
           if 'intent' in self.format['nlu'][i].keys():
             self.format['nlu'][i]['examples'] = '- '+"\n- ".join([self.annotate(example) for example in self.get_examples(self.format['nlu'][i]['intent'],"intent")])
-    def add_regex(self,regex,formats):
-        if regex_name in self.format["entities"]:
-            for i in range(len(self.format['nlu'])):
-                if 'regex' in  self.format['nlu'][i].keys():
-                    if self.format['nlu'][i]['regex']== synonym_name:
-                        self.format["nlu"][i]["examples"] = self.format["nlu"][i]["examples"] + "- ".join([synonym+"\n" for synonym in synonyms if synonym not in self.format["nlu"][i]["examples"]])
-                        return
-        self.format['entities'].append(synonym_name) 
-        dic = {
-            "synonym":synonym_name,
-            "examples": "- "+"- ".join([synonym+"\n" for synonym in synonyms])
-        }
-        self.format['nlu'].append(dic)
-
-        # Annotate all the examples again 
-        for i in range(len(self.format['nlu'])):
-          if 'intent' in self.format['nlu'][i].keys():
-            self.format['nlu'][i]['examples'] = '- '+"\n- ".join([self.annotate(example) for example in self.get_examples(self.format['nlu'][i]['intent'],"intent")])
-      
 
     def add_entity(self,entities):
         dic = {   
@@ -234,3 +215,27 @@ class nlu_format:
         for i in self.format["domain"]:
             if i["entities"] == "- "+ entity:
                 self.format["domain"].remove(i) 
+                    
+    def remove_entity_annotation(entity_name:str, example:str):
+        
+    # expecting example as: how much do I have on my [credit card account]{"entity": "account", "value": "credit"}
+    # 
+        re_search = re.search(entity_name,example)
+        if re_search  is not None:
+            labled_text = re.findall(r"\[([a-zA-Z0-9 ._]*)\]",example)[0]
+            to_remove = "[" + labled_text + "]"
+            example = example.replace(to_remove, labled_text)
+            example=re.sub("\{.*?\}","",example)
+
+            return example
+
+    def delete_entity(self,entity_name: str):
+      #check in the domain first
+      for i in self.format["domain"]:
+            if i["entities"] == "- "+ entity_name:
+                self.format["domain"].remove(i) 
+
+      for data in self.format["nlu"]:
+        if "intent" in data.keys():
+          if entity_name in data["examples"]:
+            data["examples"] = self.remove_entity_annotation(entity_name, data["example"])
