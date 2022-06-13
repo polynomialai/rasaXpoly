@@ -117,10 +117,10 @@ class nlu_format:
           if i[_type]==value:
             examples = i['examples']
             examples = "\n"+examples 
-            examples = examples.replace("\n-", ",")
+            examples = examples.replace("\n-", "SEPARATOR")
             examples = ("".join(examples))
 
-            examples = examples.split(",")
+            examples = examples.split("SEPARATOR")
             ###  removing empty strings and \n in the examples
             examples.remove('')
             for _exp_idx in range(len(examples)):
@@ -229,9 +229,37 @@ class nlu_format:
 
             return example
 
+    def remove_regex_annotation(self,regex_name:str, example:str):
+
+    # expecting example as how much do I have on my [credit card account](account_number)
+        re_search = re.search(regex_name,example)
+        if re_search  is not None:
+            labled_text = re.findall(r"\[([a-zA-Z0-9 ._]*)\]",example)[0]
+            to_remove = "[" + labled_text + "]"
+            example = example.replace(to_remove, labled_text)
+            example=re.sub("\(.*?\)","",example)
+
+            return example
+
     def delete_entity(self,entity_name: str):
       #check in the domain first 
       for data in self.format["nlu"]:
         if "intent" in data.keys():
-          if entity_name in data["examples"]:
-            data["examples"] = self.remove_entity_annotation(entity_name, data["example"])
+          examples_list = self.get_examples(data["intent"],"intent")
+          for example in range(len(examples_list)):
+            if entity_name in examples_list[example]:
+              examples_list[example] = self.remove_entity_annotation(entity_name, examples_list[example])
+          data["example"] = "- " + "\n- ".join([_example for _example in examples_list])
+          
+
+
+    def delete_regex(self,regex_name: str):
+    
+      for data in self.format["nlu"]:
+        if "intent" in data.keys():
+          examples_list = self.get_examples(data["intent"],"intent")
+          for example in range(len(examples_list)):
+            if regex_name in examples_list[example]:
+              examples_list[example] = self.remove_regex_annotation(regex_name, examples_list[example])
+          data["example"] = "- " + "\n- ".join([_example for _example in examples_list])
+        
