@@ -1418,9 +1418,13 @@ def create_app(
         app.config.nlu.create_intent(name_of_intent,examples)
         app.config.nlu.save_nlu()
         return response.text("I got it")
-
+    @app.post("/clean_nlu")
+    def clean_nlu(request:Request)->HTTPResponse:
+        app.config.nlu.purge_nlu()
+        return response.text("Cleaned NLU Successfully")
+        
     @app.post("/add_regex")
-    def add_regex(request:Request)->None:
+    def add_regex(request:Request)->HTTPResponse:
         # print("Receiving")
         data = request.json
         name_of_regex = data['displayName']

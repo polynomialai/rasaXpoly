@@ -87,6 +87,10 @@ class nlu_format:
     def load_nlu(self,filename):
         with open(f'config.json') as json_file:
             self.format = json.load(json_file)
+    def purge_nlu(self):
+      self.format['nlu']=[]
+      self.format['intents']=[]
+      self.format['entites']=[]
 
     def create_intent(self,intent,examples=None):
         if intent in self.format["intents"]:
@@ -142,11 +146,7 @@ class nlu_format:
         
         for reg in regex_list:
           regex_example_list = self.list_regex_example(regex_entity=reg)
-          # print("Regex is:",reg)
-          print(regex_example_list)
           for reg_code in regex_example_list:
-            # reg_code=reg_code.replace("\n", "")
-            print(reg_code)
             regex_search = re.search(reg_code, example)
             if regex_search is not None:
               return add_regex_annotation(example,regex_search.group(), reg)
@@ -176,11 +176,11 @@ class nlu_format:
           examples = r["examples"]
           examples = "\n"+examples
           examples = examples.replace("\n-", "SEPARATOR")
-          examples = ("".join(examples))
+          examples = ("".join([example.strip() for example in examples]))
 
-          examples = examples.split("SEPARATOR")
-          ###  removing empty strings and \n in the examples
+          examples = examples.split("SEPARATOR")            
           examples.remove('')
+
           for _exp_idx in range(len(examples)):
               examples[_exp_idx] = examples[_exp_idx].replace('\n','')
 
@@ -234,4 +234,3 @@ class nlu_format:
         for i in self.format["domain"]:
             if i["entities"] == "- "+ entity:
                 self.format["domain"].remove(i) 
-                
