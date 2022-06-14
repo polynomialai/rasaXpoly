@@ -1609,3 +1609,5 @@ def _extract_core_additional_arguments(request: Request) -> Dict[Text, Any]:
 
 def _extract_nlu_additional_arguments(request: Request) -> Dict[Text, Any]:
     return {"num_threads": rasa.utils.endpoints.int_arg(request, "num_threads", 1)}
+#dummy 
+
