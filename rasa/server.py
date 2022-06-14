@@ -3,8 +3,10 @@ import concurrent.futures
 import logging
 import multiprocessing
 import os
+import aiofiles
 import tempfile
 import traceback
+import zipfile
 from collections import defaultdict
 from functools import reduce, wraps
 from inspect import isawaitable
@@ -47,6 +49,7 @@ from rasa.shared.core.training_data.story_writer.yaml_story_writer import (
     YAMLStoryWriter,
 )
 from rasa.shared.importers.importer import TrainingDataImporter
+from rasa.shared.importers.rasa import RasaFileImporter
 from rasa.shared.nlu.training_data.formats import RasaYAMLReader
 from rasa.core.constants import DEFAULT_RESPONSE_TIMEOUT
 from rasa.constants import MINIMUM_COMPATIBLE_VERSION
@@ -78,6 +81,8 @@ from rasa.nlu.test import CVEvaluationResult
 from rasa.shared.utils.schemas.events import EVENTS_SCHEMA
 from rasa.utils.endpoints import EndpointConfig
 from rasa.format.format import nlu_format
+from rasa.cli.train import run_nlu_training
+from rasa.model_training import train_nlu
 
 if TYPE_CHECKING:
     from ssl import SSLContext  # noqa: F401
@@ -678,7 +683,7 @@ def create_app(
             user_id="username",
         )
     app.config.nlu = nlu_format()
-    app.config.nlu.load_nlu(filename="config.json")
+    app.config.nlu.load_nlu(filename="config.json") 
     app.ctx.agent = agent
     # Initialize shared object of type unsigned int for tracking
     # the number of active training processes
@@ -1359,6 +1364,7 @@ def create_app(
                     {"parameter": "model_server", "in": "body"},
                 )
 
+        import zipfile
         new_agent = await _load_agent(
             model_path=model_path,
             model_server=model_server,
@@ -1480,8 +1486,18 @@ def create_app(
                     return response.json({})
             # print(i)
         return response.json({})
-
-
+    
+    @app.post("/dialogflow_train")
+    async def omo(request):
+        if not os.path.exists("./data"):
+            os.makedirs("./data")
+        async with aiofiles.open(request.files["file"][0].name, 'wb') as f:
+            await f.write(request.files["file"][0].body)
+        f.close()
+        with zipfile.ZipFile(os.path.abspath(request.files["file"][0].name), 'r') as zip_ref:
+             zip_ref.extractall(os.path.abspath("./data/model_Data"))
+        trained_model_path = train_nlu(config="config.yml", nlu_data="data", output="models/")
+        return response.text(trained_model_path)        
     return app
 
 
