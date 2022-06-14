@@ -1494,6 +1494,10 @@ def create_app(
         async with aiofiles.open(request.files["file"][0].name, 'wb') as f:
             await f.write(request.files["file"][0].body)
         f.close()
+        print()
+        async with aiofiles.open(request.files["config"][0].name, 'wb') as f:
+            await f.write(request.files["config"][0].body)
+        f.close()
         with zipfile.ZipFile(os.path.abspath(request.files["file"][0].name), 'r') as zip_ref:
              zip_ref.extractall(os.path.abspath("./data/model_Data"))
         trained_model_path = train_nlu(config="config.yml", nlu_data="data", output="models/")
