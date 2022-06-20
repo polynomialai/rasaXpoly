@@ -686,7 +686,8 @@ def create_app(
         )
     app.config.nlu = nlu_format()
     app.config.nlu.load_nlu(filename="config.json") 
-    app.config.mongo = pymongo.MongoClient("mongodb+srv://Prasad:Prasad@cluster0.sxofrx1.mongodb.net/?retryWrites=true&w=majority")
+    app.config.pass_ = "Prasad"
+    app.config.mongo = pymongo.MongoClient(f"mongodb+srv://Prasad:{app.config.pass_}@cluster0.sxofrx1.mongodb.net/?retryWrites=true&w=majority")
     app.config.db = app.config.mongo['logs']
     app.config.agentName = app.config.nlu.get_name() 
     app.config.logs_coll = app.config.db[app.config.agentName]
