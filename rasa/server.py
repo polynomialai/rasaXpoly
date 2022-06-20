@@ -26,6 +26,8 @@ from typing import (
     Coroutine,
 )
 import yaml
+import pymongo
+from datetime import datetime
 
 import aiohttp
 import jsonschema
@@ -684,6 +686,11 @@ def create_app(
         )
     app.config.nlu = nlu_format()
     app.config.nlu.load_nlu(filename="config.json") 
+    app.config.mongo = pymongo.MongoClient("mongodb+srv://Prasad:Prasad@cluster0.sxofrx1.mongodb.net/?retryWrites=true&w=majority")
+    app.config.db = app.config.mongo['logs']
+    app.config.agentName = app.config.nlu.get_name() 
+    app.config.logs_coll = app.config.db[app.config.agentName]
+    app.config.session_id = "00000"
     app.ctx.agent = agent
     # Initialize shared object of type unsigned int for tracking
     # the number of active training processes
@@ -1061,7 +1068,7 @@ def create_app(
         #     "train your model.",
         # )
 
-        training_payload = _training_payload_from_yaml(yaml.dump(app.config.nlu.data()), temporary_directory)
+        training_payload = _training_payload_from_yaml(yaml.dump(app.config.nlu.create_training_data()), temporary_directory)
 
         try:
             with app.ctx.active_training_processes.get_lock():
@@ -1324,6 +1331,7 @@ def create_app(
             data = emulator.normalise_request_json(request.json)
             try:
                 parsed_data = await app.ctx.agent.parse_message(data.get("text"))
+                
             except Exception as e:
                 logger.debug(traceback.format_exc())
                 raise ErrorResponse(
@@ -1332,7 +1340,11 @@ def create_app(
                     f"An unexpected error occurred. Error: {e}",
                 )
             response_data = emulator.normalise_response_json(parsed_data)
-
+            app.config.logs_coll.insert_one({
+                    "uuid":app.config.session_id+datetime.now().strftime("%m%d%Y%H%M%S"),
+                    "query":request.json['text'],
+                    "result":response_data
+                })
             return response.json(response_data)
 
         except Exception as e:
@@ -1416,15 +1428,20 @@ def create_app(
                 f"header.",
             )
     @app.post("/add_intent")
-    def add_intent(request:Request)->None:
+    def add_intent(request:Request)->HTTPResponse:
         data = request.json
         name_of_intent = data['displayName']
         examples = [example['parts'][0]['text'] for example in data['trainingPhrases']]
-        app.config.nlu.create_intent(name_of_intent,examples)
+        stat = app.config.nlu.create_intent(name_of_intent,examples)
         app.config.nlu.save_nlu()
-        return response.json({
-            "displayName":data['displayName']
-        })
+        return response.json(stat)
+
+    @app.post("/delete_intent")
+    def delete_intent(request:Request)->HTTPResponse:
+        data = request.json
+        uuid = data['name'].split("/")[-1]
+        app.config.nlu.delete_intent(uuid)
+        return response.json({})
 
     @app.post("/clean_nlu")
     def clean_nlu(request:Request)->HTTPResponse:
@@ -1437,27 +1454,36 @@ def create_app(
         name_of_regex = data['displayName']
         examples = request.json['synonyms']
         app.config.nlu.create_regex(name_of_regex,examples)
-        return response.text("I got it")
+        return response.json(data)
     
     @app.post("/add_entity")
     def add_entity(request:Request)->None:
         data = request.json
         _type = data['kind']
-        if _type=="regex":
+        res=[]
+        if _type=="KIND_REGEXP":
             for i in data['entities']:
                 name_of_regex = i['value']
                 examples = i['synonyms']
-                app.config.nlu.create_regex(name_of_regex,examples)
+                stat = app.config.nlu.create_regex(name_of_regex,examples)
+                res.append(stat)
             app.config.nlu.save_nlu()
-        
-        if _type=="synonym":
+
+        if _type=="KIND_MAP":
             for i in data['entities']:
                 synonym_name = i['value']
                 synonyms = i['synonyms']
-                app.config.nlu.add_synonyms(synonym_name,synonyms)
+                stat = app.config.nlu.add_synonyms(synonym_name,synonyms)
+                res.append(stat)
+            app.config.nlu.save_nlu()
+
+        if _type=="KIND_UNSPECIFIED":
+            for i in data['entities']:
+                entity_name = i['value']
+                app.config.nlu.add_entity(synonym_name)
                 app.config.nlu.save_nlu()
 
-        return response.json(data)
+        return response.json(res)
 
     @app.get("/get_examples")
     def get_exmaples(request:Request)->HTTPResponse:
@@ -1470,38 +1496,65 @@ def create_app(
         synonyms = request.json['synonyms']
         app.config.nlu.add_synonyms(synonym_name,synonyms)
         app.config.nlu.save_nlu()
-        return response.text("I got it")
+        return response.json(request.json)
     
-    @app.delete("/delete_entity/<entity_name>")
-    def delete_entity(request:Request,entity_name)->HTTPResponse:
-        for i in app.config.nlu.data()['nlu']:
-            
-            if 'synonym' in i.keys():
-                if i['synonym']==entity_name:
-                    app.config.nlu.delete_entity(entity_name)
-                    return response.json({})
-            if 'regex' in i.keys():
-                if i['regex']==entity_name:
-                    app.config.nlu.delete_regex(regex_name)
-                    return response.json({})
-            # print(i)
+    @app.post("/delete_entity")
+    def delete_entity(request:Request)->HTTPResponse:
+        app.config.nlu.delete_entity(request.json['name'])
         return response.json({})
     
+    @app.get("/agent_path")
+    def agent_path(request:Request)->HTTPResponse:
+        return reponse.text("projects\\quilt-review-analytics")
+
     @app.post("/dialogflow_train")
-    async def omo(request):
+    async def dialogflow_train(request):
         if not os.path.exists("./data"):
             os.makedirs("./data")
         async with aiofiles.open(request.files["file"][0].name, 'wb') as f:
             await f.write(request.files["file"][0].body)
         f.close()
-        print()
         async with aiofiles.open(request.files["config"][0].name, 'wb') as f:
             await f.write(request.files["config"][0].body)
         f.close()
         with zipfile.ZipFile(os.path.abspath(request.files["file"][0].name), 'r') as zip_ref:
              zip_ref.extractall(os.path.abspath("./data/model_Data"))
         trained_model_path = train_nlu(config="config.yml", nlu_data="data", output="models/")
-        return response.text(trained_model_path)        
+        return response.text(trained_model_path)      
+  
+    @app.post("/get_intent")
+    def get_intent(request:Request)->HTTPResponse:
+        return response.json(app.config.nlu.get_intent(request.json['name']))
+
+    @app.get("/get_formatted_data")
+    def get_formatted_data(request:Request)->HTTPResponse:
+        return response.json(app.config.nlu.create_training_data())
+
+    @app.get("/create_session_path")
+    def create_session_path(request:Request)->HTTPResponse:
+        app.config.session_id = request.json['session_id']
+        return response.text("projects\\quilt-review-analytics\\agent\\sessions\\"+request.json['session_id'])
+
+    @app.post("/get_agent")
+    def get_agent(request:Request):
+        return response.json([
+                                    {
+                                       "supportedLanguageCodes": [ 'en-in' ],
+                                        "parent": 'projects/quilt-review-analytics',
+                                        "displayName": 'colive-classifer-1',
+                                        "defaultLanguageCode": 'en',
+                                        "timeZone": 'Asia/Almaty',
+                                        "description": '',
+                                        "avatarUri": '',
+                                        "enableLogging": True,
+                                        "matchMode": 'MATCH_MODE_HYBRID',
+                                        "classificationThreshold": 0.30000001192092896,
+                                        "apiVersion": 'API_VERSION_V2_BETA_1',
+                                        "tier": 'TIER_STANDARD'
+                                    },
+                                    None,
+                                    None
+                            ])
     return app
 
 
@@ -1570,7 +1623,6 @@ def _training_payload_from_yaml(
     model_output_directory = str(temp_dir)
     # if rasa.utils.endpoints.bool_arg(request, "save_to_default_model_directory", True):
     model_output_directory = DEFAULT_MODELS_PATH
-    # print(str(training_data))
     return dict(
         domain=str(training_data),
         config=str(training_data),
