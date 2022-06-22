@@ -1431,22 +1431,58 @@ def create_app(
     @app.post("/add_intent")
     def add_intent(request:Request)->HTTPResponse:
         data = request.json
-        name_of_intent = data['displayName']
-        examples = [example['parts'][0]['text'] for example in data['trainingPhrases']]
-        stat = app.config.nlu.create_intent(name_of_intent,examples)
+        # examples = [example['parts'][0]['text'] for example in data['trainingPhrases']]
+        stat = app.config.nlu.create_intent(data['displayName'])
+        # stat['name']=stat['uuid']
         app.config.nlu.save_nlu()
-        return response.json(stat)
+        stat['inputContextNames']=[]
+        stat["events"]= []
+        stat["outputContexts"] = []
+        stat["messages"]=[]
+        stat["defaultResponsePlatforms"] = []
+        stat["followupIntentInfo"] = []
+        stat["priority"] = 500000
+        stat["isFallback"] = False
+        stat["webhookState"] = 'WEBHOOK_STATE_UNSPECIFIED'
+        stat["action"] = ""
+        stat["resetContexts"] = False
+        stat["rootFollowupIntentName"] = ""
+        stat["parentFollowupIntentName"]= ""
+        stat["mlDisabled"]= False
+        return response.json([stat,None,None])
+    
+    @app.post("update_intent")
+    def update_intent(request:Request)->HTTPResponse:
+        stat = app.config.nlu.update_intent(request.json['intent'])
+        app.config.nlu.save_nlu()
+        stat['inputContextNames']=[]
+        stat["events"]= []
+        stat["outputContexts"] = []
+        stat["messages"]=[]
+        stat["defaultResponsePlatforms"] = []
+        stat["followupIntentInfo"] = []
+        stat["priority"] = 500000
+        stat["isFallback"] = False
+        stat["webhookState"] = 'WEBHOOK_STATE_UNSPECIFIED'
+        stat["action"] = ""
+        stat["resetContexts"] = False
+        stat["rootFollowupIntentName"] = ""
+        stat["parentFollowupIntentName"]= ""
+        stat["mlDisabled"]= False
+        return response.json([stat,None,None])
 
     @app.post("/delete_intent")
     def delete_intent(request:Request)->HTTPResponse:
         data = request.json
-        uuid = data['name'].split("/")[-1]
-        app.config.nlu.delete_intent(uuid)
-        return response.json({})
+        name = data['name']
+        app.config.nlu.delete_intent(name)
+        app.config.nlu.save_nlu()
+        return response.json([{},None,None])
 
     @app.post("/clean_nlu")
     def clean_nlu(request:Request)->HTTPResponse:
         app.config.nlu.purge_nlu()
+        app.config.nlu.save_nlu()
         return response.text("Cleaned NLU Successfully")
         
     @app.post("/add_regex")
@@ -1460,36 +1496,19 @@ def create_app(
     @app.post("/add_entity")
     def add_entity(request:Request)->None:
         data = request.json
-        _type = data['kind']
-        res=[]
-        if _type=="KIND_REGEXP":
-            for i in data['entities']:
-                name_of_regex = i['value']
-                examples = i['synonyms']
-                stat = app.config.nlu.create_regex(name_of_regex,examples)
-                res.append(stat)
-            app.config.nlu.save_nlu()
-
-        if _type=="KIND_MAP":
-            for i in data['entities']:
-                synonym_name = i['value']
-                synonyms = i['synonyms']
-                stat = app.config.nlu.add_synonyms(synonym_name,synonyms)
-                res.append(stat)
-            app.config.nlu.save_nlu()
-
-        if _type=="KIND_UNSPECIFIED":
-            for i in data['entities']:
-                entity_name = i['value']
-                app.config.nlu.add_entity(synonym_name)
-                app.config.nlu.save_nlu()
-
-        return response.json(res)
-
-    @app.get("/get_examples")
-    def get_exmaples(request:Request)->HTTPResponse:
-        data = app.config.nlu.data()
-        return response.json(data)
+        stat = app.config.nlu.add_entity(data)
+        app.config.nlu.save_nlu()
+        stat['autoExpansionMode']="AUTO_EXPANSION_MODE_UNSPECIFIED"
+        stat["enableFuzzyExtraction"]=False
+        return response.json([stat,None,None])
+    
+    @app.post("/update_entity")
+    def update_entity(request:Request)->HTTPResponse:
+        stat = app.config.nlu.update_entity(request.json['entityType'])
+        app.config.nlu.save_nlu()
+        stat['autoExpansionMode']="AUTO_EXPANSION_MODE_UNSPECIFIED"
+        stat["enableFuzzyExtraction"]=False
+        return response.json([stat,None,None])
 
     @app.post("/add_synonyms")
     def add_synonyms(request:Request)->HTTPResponse:
@@ -1502,11 +1521,11 @@ def create_app(
     @app.post("/delete_entity")
     def delete_entity(request:Request)->HTTPResponse:
         app.config.nlu.delete_entity(request.json['name'])
-        return response.json({})
+        return response.json([{},None,None])
     
-    @app.get("/agent_path")
+    @app.post("/agent_path")
     def agent_path(request:Request)->HTTPResponse:
-        return reponse.text("projects\\quilt-review-analytics")
+        return response.text("projects\\guru-inc-bot-9abn\\agent")
 
     @app.post("/dialogflow_train")
     async def dialogflow_train(request):
@@ -1525,17 +1544,28 @@ def create_app(
   
     @app.post("/get_intent")
     def get_intent(request:Request)->HTTPResponse:
-        return response.json(app.config.nlu.get_intent(request.json['name']))
-
+        t_intent = app.config.nlu.get_intent(request.json['name'])
+        return response.json([t_intent,None,None])
+    
     @app.get("/get_formatted_data")
     def get_formatted_data(request:Request)->HTTPResponse:
         return response.json(app.config.nlu.create_training_data())
 
-    @app.get("/create_session_path")
+    @app.post("/create_session_path")
     def create_session_path(request:Request)->HTTPResponse:
         app.config.session_id = request.json['session_id']
         return response.text("projects\\quilt-review-analytics\\agent\\sessions\\"+request.json['session_id'])
 
+    @app.post("/intent_path")
+    def intent_path(request:Request)->HTTPResponse:
+        return response.json({
+            "intent_id":request.json["project_id"]+"/agent/intents/"+request.json["intent_id"]
+        })
+    @app.post("/entityTypePath")
+    def entityTypePath(request:Request)->HTTPResponse:
+        return response.json({
+            "entity_typeID":request.json["entity_typeID"]
+        })
     @app.post("/get_agent")
     def get_agent(request:Request):
         return response.json([
@@ -1556,6 +1586,13 @@ def create_app(
                                     None,
                                     None
                             ])
+    @app.get("/all_Data")
+    def all_data(request:Request)->HTTPResponse:
+        return response.json(app.config.nlu.data())
+    @app.get("/list_entity_types")
+    def list_entity_types(request:Request)->HTTPResponse:
+        return response.json(app.config.nlu.get_entities())
+
     return app
 
 

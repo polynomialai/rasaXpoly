@@ -93,44 +93,73 @@ class nlu_format:
     def purge_nlu(self):
       self.format['nlu']=[]
       self.format['intents']=[]
-      self.format['entites']=[]
+      self.format['entities']=[]
 
-    def create_intent(self,intent,examples=None):
-        if intent in self.format["intents"]:
-            for i in range(len(self.format['nlu'])):
-                if 'intent' in  self.format['nlu'][i].keys():
-                    if self.format['nlu'][i]['intent']== intent:
-                        for example in examples:
-                          self.format['nlu'][i]['examples'].append(example)
-                          self.format['nlu'][i]['examples'] = list(set(self.format['nlu'][i]['examples']))
-                        return self.format["nlu"][i]
-        
-        self.format['intents'].append(intent) 
+    def create_training_phrase(self,phrase):
+      return {
+              "parts": [
+                {
+                  "text": phrase,
+                  "entityType": '',
+                  "alias": '',
+                  "userDefined": False
+                }
+              ],
+              "name": uuid.uuid4(),
+              "type": 'EXAMPLE',
+              "timesAddedCount": 0
+            }
+
+
+    def create_intent(self,displayName,trainingPhrases=[]):
+        self.format['intents'].append(displayName) 
         dic = {
-            "uuid":str(uuid.uuid4()),
-            "intent":intent,
-            "examples": [example for example in examples]
+            "type":"intent",
+            "name":"projects/guru-inc-bot-9abn/agent/intents/"+str(uuid.uuid4()),
+            "displayName":displayName,
+            "trainingPhrases": [],
+            "parameters":[]
         }
         self.format['nlu'].append(dic)
         return dic
+    
+    def update_intent(self,updated_intent):
+      for i in range(len(self.format['nlu'])):
+        if self.format['nlu'][i]['name']== updated_intent['name']:
+          self.format['intents'] = [intent for intent in self.format['intents'] if intent!=self.format['nlu'][i]['displayName']]
+          self.format['intents'].append(updated_intent['displayName'])
+          self.format['nlu'][i]['displayName'] = updated_intent['displayName']
+          for k in range(len(updated_intent['trainingPhrases'])):
+            training_phrase = updated_intent['trainingPhrases'][k][0]
+            training_phrase['name'] = str(uuid.uuid4())
+            updated_intent['trainingPhrases'][k] = training_phrase 
+          self.format['nlu'][i]['trainingPhrases'] = updated_intent['trainingPhrases']
+          self.format['nlu'][i]['parameters'] = updated_intent['parameters']
+          return self.format['nlu'][i]
+      return None
 
-    def get_intent(self,uuid):
+    def get_intent(self,name):
       for i in self.format['nlu']:
-        if 'uuid' in i.keys(): 
-          if i['uuid']==uuid:
+        if 'name' in i.keys(): 
+          if i['name']==name:
             return i  
 
-    def get_examples(self,value,_type):
+    def get_examples(self,synonym):
+      arr = []
+      print("Getting Examples for Synonym:",synonym)
       for i in self.format['nlu']:
-        if _type in i.keys():
-          if i[_type]==value:
-            return i['examples']
-       
+        if i['displayName']==synonym:
+          print(i)
+          for j in i['entities']:
+            for k in j['synonyms']:
+              arr.append(k)
+      return arr
+
     def annotate(self,example, type="synonym"):
       if type == "synonym":
         for entity in self.format['entities']:
-          if self.get_examples(entity,"synonym"):
-            for synonym in self.get_examples(entity,"synonym"):
+          if self.get_examples(entity):
+            for synonym in self.get_examples(entity):
               if synonym in example:
                 example = annotate_example(example, synonym , entity, synonym)
         return example
@@ -138,21 +167,23 @@ class nlu_format:
       if type == "regex":
         regex_list = []
         for r in self.format['nlu']:
-          if "regex" in r.keys():
-            regex_list.append(r["regex"])
+          if "kind" in r.keys():
+            if r['kind']=='KIND_REGEXP':
+              regex_list.append(r["displayName"])
 
         
         for reg in regex_list:
-          regex_example_list = self.list_regex_example(regex_entity=reg)
+          regex_example_list = self.get_examples(reg)
           for reg_code in regex_example_list:
             regex_search = re.search(reg_code, example)
             if regex_search is not None:
               return add_regex_annotation(example,regex_search.group(), reg)
         return example
-
-    def list_intent(self):
-        return self.format["nlu"]
     
+    def get_entities(self):
+      res = [nlu_item for nlu_item in self.format['nlu'] if nlu_item['type']=='entity']
+      return res 
+         
     def create_regex(self,regex_intent,examples=None):
       for i in range(len(self.format['nlu'])):
           if 'regex' in  self.format['nlu'][i].keys():
@@ -172,6 +203,7 @@ class nlu_format:
       self.format['nlu'].append(dic)
       return dic
 
+    
     def list_regex_example(self, regex_entity):
       for r in self.format["nlu"]:
         if "regex" in r.keys():
@@ -196,15 +228,36 @@ class nlu_format:
         self.format['nlu'].append(dic)
         return dic
 
-    def add_entity(self,entities):
-        self.format["entities"].append(entites)
-        return {}
+    def add_entity(self,entity):
+        self.format["entities"].append(entity['displayName'])
+        dic = {
+            "type":"entity",
+            "name":"projects/guru-inc-bot-9abn/agent/entityTypes/"+str(uuid.uuid4()),
+            "entities": [],
+            "displayName": entity['displayName'],
+            "kind": entity['kind']
+        }
+        self.format['nlu'].append(dic)
+        return dic
 
-    def delete_intent(self,uuid):
+    def update_entity(self,updated_entity):
+      for i in range(len(self.format['nlu'])):
+        if self.format['nlu'][i]['name']== updated_entity['name']:
+          self.format['entities'] = [entity for entity in self.format['entities'] if entity!=self.format['nlu'][i]['displayName']]
+          self.format['entities'].append(updated_entity['displayName'])
+          self.format['nlu'][i]['displayName'] = updated_entity['displayName']
+          for k in range(len(updated_entity['entities'])):
+            updated_entity['entities'][k] = updated_entity['entities'][k][0] 
+          self.format['nlu'][i]['entities'] = updated_entity['entities']
+          return self.format['nlu'][i]
+      return None
+
+
+    def delete_intent(self,name):
       for i in self.format['nlu']:
-        if i['uuid']==uuid:
-          self.format['intents'] = [intent for intent in self.format['intents'] if intent!=i['intent']]
-      self.format['nlu'] = [nlu_item for nlu_item in self.format['nlu'] if nlu_item['uuid']!=uuid]
+        if i['name']==name:
+          self.format['intents'] = [intent for intent in self.format['intents'] if intent!=i['displayName']]
+      self.format['nlu'] = [nlu_item for nlu_item in self.format['nlu'] if nlu_item['name']!=name]
       return {}
     
     ## Legacy Code                 
@@ -233,16 +286,12 @@ class nlu_format:
 
     #         return example
 
-    def delete_entity(self,uuid: str):
+    def delete_entity(self,name: str):
       #check in the domain first 
       for data in self.format["nlu"]:
-        if data['uuid'] == uuid:
-          if 'regex' in data.keys():
-            self.format['entites'] = [entity for entity in self.format['entites'] if entity!=data['regex']]
-          else:
-            self.format['entites'] = [entity for entity in self.format['entites'] if entity!=data['synonym']]
-          break    
-      self.format['nlu'] = [nlu_item for nlu_item in self.format['nlu'] if nlu_item['uuid']!=uuid]
+        if data['name'] == name:
+            self.format['entities'] = [entity for entity in self.format['entities'] if name!=data['name']]
+      self.format['nlu'] = [nlu_item for nlu_item in self.format['nlu'] if nlu_item['name']!=name]
       return {}
 
 
@@ -262,30 +311,30 @@ class nlu_format:
       for i in self.format['nlu']:
         nlu_item={}
         dic = {}
-        if 'intent' in i.keys():
-          nlu_item['intent'] = i['intent']
+        if i['type']=="intent":
+          nlu_item['intent'] = i['displayName']
           data ="- "
-          for example in i['examples']:
-            example = self.annotate(example)
+          for trainingPhrase in i['trainingPhrases']:
+            example = self.annotate(trainingPhrase["parts"][0]["text"])
             example = self.annotate(example,type="regex")
             data = data + example +"\n- "
           data = data[:-3]
           nlu_item['examples'] = data
         else:
-          if'synonym' in i.keys():
-            nlu_item['synonym'] = i['synonym']
+          if i['kind']=="KIND_MAP":
+            nlu_item['synonym'] = i['displayName']
           else:
-            nlu_item['regex'] = i['regex']
+            nlu_item['regex'] = i['displayName']
           data = "- "
-          for example in i['examples']:
-            data = data + example + "\n- "
+          for example in i['entities']:
+            for j in example['synonyms']:
+              data = data + j + "\n- "
           data = data[:-3]
           nlu_item['examples'] = data
         training_data['nlu'].append(nlu_item)
       return training_data
 
-    def delete_regex(self,regex_name: str):
-    
+    def delete_regex(self,regex_name: str):    
       for data in self.format["nlu"]:
         if "intent" in data.keys():
           examples_list = self.get_examples(data["intent"],"intent")
@@ -293,5 +342,4 @@ class nlu_format:
             if regex_name in examples_list[example]:
               examples_list[example] = self.remove_regex_annotation(regex_name, examples_list[example])
           data["examples"] = "- " + "\n- ".join([_example for _example in examples_list])
-
-      # self.format['nlu']['entites'] = [entity for entity in format['nlu']['entites'] if entity!=entity_name]  
+  
