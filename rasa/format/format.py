@@ -115,7 +115,7 @@ class nlu_format:
         self.format['intents'].append(displayName) 
         dic = {
             "type":"intent",
-            "name":"projects/guru-inc-bot-9abn/agent/intents/"+str(uuid.uuid4()),
+            "name":"projects/rasa_test_one/agent/intents/"+str(uuid.uuid4()),
             "displayName":displayName,
             "trainingPhrases": [],
             "parameters":[]
@@ -146,10 +146,8 @@ class nlu_format:
 
     def get_examples(self,synonym):
       arr = []
-      print("Getting Examples for Synonym:",synonym)
       for i in self.format['nlu']:
         if i['displayName']==synonym:
-          print(i)
           for j in i['entities']:
             for k in j['synonyms']:
               arr.append(k)
@@ -232,7 +230,7 @@ class nlu_format:
         self.format["entities"].append(entity['displayName'])
         dic = {
             "type":"entity",
-            "name":"projects/guru-inc-bot-9abn/agent/entityTypes/"+str(uuid.uuid4()),
+            "name":"projects/rasa_test_one/agent/entityTypes/"+str(uuid.uuid4()),
             "entities": [],
             "displayName": entity['displayName'],
             "kind": entity['kind']
@@ -260,6 +258,12 @@ class nlu_format:
       self.format['nlu'] = [nlu_item for nlu_item in self.format['nlu'] if nlu_item['name']!=name]
       return {}
     
+    def get_intent_by_name(self,name_of_intent):
+      for i in self.format['nlu']:
+        if i['type']=='intent':
+          if i['displayName']==name_of_intent:
+            return i
+      return {}
     ## Legacy Code                 
     # def remove_entity_annotation(self,entity_name:str, example:str):
         

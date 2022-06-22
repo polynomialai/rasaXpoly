@@ -25,6 +25,7 @@ from typing import (
     NoReturn,
     Coroutine,
 )
+import uuid
 import yaml
 import pymongo
 from datetime import datetime
@@ -1341,12 +1342,70 @@ def create_app(
                     f"An unexpected error occurred. Error: {e}",
                 )
             response_data = emulator.normalise_response_json(parsed_data)
-            app.config.logs_coll.insert_one({
-                    "uuid":app.config.session_id+datetime.now().strftime("%m%d%Y%H%M%S"),
-                    "query":request.json['text'],
-                    "result":response_data
-                })
-            return response.json(response_data)
+            # app.config.logs_coll.insert_one({
+            #         "uuid":app.config.session_id+datetime.now().strftime("%m%d%Y%H%M%S"),
+            #         "query":request.json['text'],
+            #         "result":response_data
+            #     })
+            print(response_data)
+            intent_data = app.config.nlu.get_intent_by_name(response_data["intent"]["name"])
+            print(intent_data)
+            stat = {}
+            fields =  {}
+            for i in response_data['entities']:
+                fields[i["entity"]] = {"stringValue":i['value'] ,"kind":'stringValue'}
+            stat['responseId']=str(uuid.uuid4())
+            query_result = {
+                "fulfillmentMessages":[
+                                            {
+                                                "platform": 'PLATFORM_UNSPECIFIED',
+                                                "text": { "text":[''] },
+                                                "message": 'text'
+                                            }
+                                     ],
+                "outputContexts" : [],
+                "queryText": response_data['text'],
+                "speechRecognitionConfidence": 0,
+                "action" :"",
+                "parameters":{
+                    "fields":fields
+                },
+                "allRequiredParamsPresent": True,
+                "fulfillmentText": '',
+                "webhookSource": '',
+                "webhookPayload": None,
+                "intent": {
+                            "inputContextNames": [],
+                            "events": [],
+                            "trainingPhrases": intent_data["trainingPhrases"],
+                            "outputContexts": [],
+                            "parameters": intent_data["parameters"],
+                            "messages": [],
+                            "defaultResponsePlatforms": [],
+                            "followupIntentInfo": [],
+                            "name": intent_data["name"], 
+                            "displayName": intent_data['displayName'],
+                            "priority": 0,
+                            "isFallback": False,
+                            "webhookState": 'WEBHOOK_STATE_UNSPECIFIED',
+                            "action": '',
+                            "resetContexts": False,
+                            "rootFollowupIntentName": '',
+                            "parentFollowupIntentName": '',
+                            "mlDisabled": False,
+                            "liveAgentHandoff": False,
+                            "endInteraction": False
+                        },
+                "intentDetectionConfidence": response_data["intent"]["confidence"],
+                "diagnosticInfo": None,
+                "languageCode": 'en',
+                "sentimentAnalysisResult": None
+            }
+            stat['queryResult'] = query_result
+            stat['webhookStatus'] = None
+            stat['outputAudio'] = None
+            stat['outputAudioConfig'] = None
+            return response.json([stat,None,None])
 
         except Exception as e:
             logger.debug(traceback.format_exc())
@@ -1496,7 +1555,7 @@ def create_app(
     @app.post("/add_entity")
     def add_entity(request:Request)->None:
         data = request.json
-        stat = app.config.nlu.add_entity(data)
+        stat = app.config.nlu.add_entity(data['entityType'])
         app.config.nlu.save_nlu()
         stat['autoExpansionMode']="AUTO_EXPANSION_MODE_UNSPECIFIED"
         stat["enableFuzzyExtraction"]=False
@@ -1525,7 +1584,7 @@ def create_app(
     
     @app.post("/agent_path")
     def agent_path(request:Request)->HTTPResponse:
-        return response.text("projects\\guru-inc-bot-9abn\\agent")
+        return response.text("projects\\rasa_test_one\\agent")
 
     @app.post("/dialogflow_train")
     async def dialogflow_train(request):
@@ -1571,7 +1630,7 @@ def create_app(
         return response.json([
                                     {
                                        "supportedLanguageCodes": [ 'en-in' ],
-                                        "parent": 'projects/quilt-review-analytics',
+                                        "parent": 'projects/rasa_test_one',
                                         "displayName": 'colive-classifer-1',
                                         "defaultLanguageCode": 'en',
                                         "timeZone": 'Asia/Almaty',
