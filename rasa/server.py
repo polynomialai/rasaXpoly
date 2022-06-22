@@ -1321,19 +1321,22 @@ def create_app(
     @requires_auth(app, auth_token)
     @ensure_loaded_agent(app)
     async def parse(request: Request) -> HTTPResponse:
-        validate_request_body(
-            request,
-            "No text message defined in request_body. Add text message to request body "
-            "in order to obtain the intent and extracted entities.",
-        )
+        data = {}
+        data["text"] = request.json['queryInput']['text']['text']
+        data["message_id"]= "b2831e73-1407-4ba0-a861-0f30a42a2a5a"
+        # validate_request_body(
+        #     data,
+        #     "No text message defined in request_body. Add text message to request body "
+        #     "in order to obtain the intent and extracted entities.",
+        # )
         emulation_mode = request.args.get("emulation_mode")
         emulator = _create_emulator(emulation_mode)
 
         try:
-            data = emulator.normalise_request_json(request.json)
+            data = emulator.normalise_request_json(data)
             try:
                 parsed_data = await app.ctx.agent.parse_message(data.get("text"))
-                
+                print(parsed_data)
             except Exception as e:
                 logger.debug(traceback.format_exc())
                 raise ErrorResponse(
@@ -1342,14 +1345,12 @@ def create_app(
                     f"An unexpected error occurred. Error: {e}",
                 )
             response_data = emulator.normalise_response_json(parsed_data)
-            # app.config.logs_coll.insert_one({
-            #         "uuid":app.config.session_id+datetime.now().strftime("%m%d%Y%H%M%S"),
-            #         "query":request.json['text'],
-            #         "result":response_data
-            #     })
-            print(response_data)
+            app.config.logs_coll.insert_one({
+                    "uuid":app.config.session_id+datetime.now().strftime("%m%d%Y%H%M%S"),
+                    "query":request.json['queryInput']['text']['text'],
+                    "result":response_data
+                })
             intent_data = app.config.nlu.get_intent_by_name(response_data["intent"]["name"])
-            print(intent_data)
             stat = {}
             fields =  {}
             for i in response_data['entities']:
@@ -1489,7 +1490,7 @@ def create_app(
             )
     @app.post("/add_intent")
     def add_intent(request:Request)->HTTPResponse:
-        data = request.json
+        data = request.json['intent']
         # examples = [example['parts'][0]['text'] for example in data['trainingPhrases']]
         stat = app.config.nlu.create_intent(data['displayName'])
         # stat['name']=stat['uuid']
@@ -1584,7 +1585,7 @@ def create_app(
     
     @app.post("/agent_path")
     def agent_path(request:Request)->HTTPResponse:
-        return response.text("projects\\rasa_test_one\\agent")
+        return response.text("projects\\guru-inc-bot-9abn\\agent")
 
     @app.post("/dialogflow_train")
     async def dialogflow_train(request):
@@ -1630,7 +1631,7 @@ def create_app(
         return response.json([
                                     {
                                        "supportedLanguageCodes": [ 'en-in' ],
-                                        "parent": 'projects/rasa_test_one',
+                                        "parent": 'projects/guru-inc-bot-9abn',
                                         "displayName": 'colive-classifer-1',
                                         "defaultLanguageCode": 'en',
                                         "timeZone": 'Asia/Almaty',
@@ -1645,10 +1646,20 @@ def create_app(
                                     None,
                                     None
                             ])
+    
+    @app.post("/get_entity_type")
+    def get_entity_type(request:Request)->HTTPResponse:
+        t_intent = app.config.nlu.get_intent(request.json['name'])
+        return response.json([t_intent,None,None])
+    
+    @app.post("/entity_type_path")
+    def entity_type_path(request:Request)->HTTPResponse:
+        return response.text("projects/"+"guru-inc-bot-9abn/entityTypes/"+request.json['entity_typeID'])
+
     @app.get("/all_Data")
     def all_data(request:Request)->HTTPResponse:
         return response.json(app.config.nlu.data())
-    @app.get("/list_entity_types")
+    @app.post("/list_entity_types")
     def list_entity_types(request:Request)->HTTPResponse:
         return response.json(app.config.nlu.get_entities())
 

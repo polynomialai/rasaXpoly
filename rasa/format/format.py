@@ -112,10 +112,12 @@ class nlu_format:
 
 
     def create_intent(self,displayName,trainingPhrases=[]):
+        if displayName in self.format['intents']:
+          return {}
         self.format['intents'].append(displayName) 
         dic = {
             "type":"intent",
-            "name":"projects/rasa_test_one/agent/intents/"+str(uuid.uuid4()),
+            "name":"projects/guru-inc-bot-9abn/agent/intents/"+str(uuid.uuid4()),
             "displayName":displayName,
             "trainingPhrases": [],
             "parameters":[]
@@ -128,9 +130,10 @@ class nlu_format:
         if self.format['nlu'][i]['name']== updated_intent['name']:
           self.format['intents'] = [intent for intent in self.format['intents'] if intent!=self.format['nlu'][i]['displayName']]
           self.format['intents'].append(updated_intent['displayName'])
+
           self.format['nlu'][i]['displayName'] = updated_intent['displayName']
           for k in range(len(updated_intent['trainingPhrases'])):
-            training_phrase = updated_intent['trainingPhrases'][k][0]
+            training_phrase = updated_intent['trainingPhrases'][k]
             training_phrase['name'] = str(uuid.uuid4())
             updated_intent['trainingPhrases'][k] = training_phrase 
           self.format['nlu'][i]['trainingPhrases'] = updated_intent['trainingPhrases']
@@ -227,10 +230,12 @@ class nlu_format:
         return dic
 
     def add_entity(self,entity):
+        if entity in self.format["entities"]:
+          return {} 
         self.format["entities"].append(entity['displayName'])
         dic = {
             "type":"entity",
-            "name":"projects/rasa_test_one/agent/entityTypes/"+str(uuid.uuid4()),
+            "name":"projects/guru-inc-bot-9abn/agent/entityTypes/"+str(uuid.uuid4()),
             "entities": [],
             "displayName": entity['displayName'],
             "kind": entity['kind']
@@ -245,7 +250,7 @@ class nlu_format:
           self.format['entities'].append(updated_entity['displayName'])
           self.format['nlu'][i]['displayName'] = updated_entity['displayName']
           for k in range(len(updated_entity['entities'])):
-            updated_entity['entities'][k] = updated_entity['entities'][k][0] 
+            updated_entity['entities'][k] = updated_entity['entities'][k] 
           self.format['nlu'][i]['entities'] = updated_entity['entities']
           return self.format['nlu'][i]
       return None

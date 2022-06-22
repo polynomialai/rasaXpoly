@@ -59,16 +59,7 @@ format = {
                             "session_config": {
                                 "session_expiration_time": 60
                             },
-                            "nlu": [
-                                {
-                                    "intent": "greet",
-                                    "examples": "- hey\n- hello\n"
-                                },
-                                {
-                                    "intent": "goodbye",
-                                    "examples": "- bye\n- goodbye\n"
-                                }
-                            ],
+                            "nlu": [],
                             "rules": [],
                             "stories": []
                       }
