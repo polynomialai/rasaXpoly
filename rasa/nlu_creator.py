@@ -1,5 +1,6 @@
 import json
 format = {
+    "name":"Dummy Agent 1",
                             "pipeline": [
     {
       "name": "WhitespaceTokenizer"
