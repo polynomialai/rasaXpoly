@@ -73,6 +73,22 @@ class nlu_format:
                                 {
                                     "intent": "goodbye",
                                     "examples": "- bye\n- goodbye\n"
+                                },
+                                {
+                                  "regex": "Float",
+                                  "examples": "- [-+]*\d{1,100}.\d{1,100}"
+                                },
+                                {
+                                  "intent": "Float",
+                                  "examples": " - [1.1](Float) [2.0](Float)\n- [.0](Float) [-0.1](Float) [+1.1](Float)"
+                                },
+                                {
+                                  "regex": "email",
+                                  "examples": "- [a-z0-9+_.-]+@[a-z0-9.-]+" 
+                                },
+                                {
+                                   "intent": "e-mail",
+                                   "examples": "- my emial number is [demomail@gmail.com](mail)\n- This is my emial [demomail@demomail.ai](mail)"
                                 }
                             ],
                             "rules": [],
