@@ -3,8 +3,10 @@ import concurrent.futures
 import logging
 import multiprocessing
 import os
+import aiofiles
 import tempfile
 import traceback
+import zipfile
 from collections import defaultdict
 from functools import reduce, wraps
 from inspect import isawaitable
@@ -23,7 +25,11 @@ from typing import (
     NoReturn,
     Coroutine,
 )
+import uuid
 import yaml
+import pymongo
+from datetime import datetime
+import json
 
 import aiohttp
 import jsonschema
@@ -47,6 +53,7 @@ from rasa.shared.core.training_data.story_writer.yaml_story_writer import (
     YAMLStoryWriter,
 )
 from rasa.shared.importers.importer import TrainingDataImporter
+from rasa.shared.importers.rasa import RasaFileImporter
 from rasa.shared.nlu.training_data.formats import RasaYAMLReader
 from rasa.core.constants import DEFAULT_RESPONSE_TIMEOUT
 from rasa.constants import MINIMUM_COMPATIBLE_VERSION
@@ -78,6 +85,8 @@ from rasa.nlu.test import CVEvaluationResult
 from rasa.shared.utils.schemas.events import EVENTS_SCHEMA
 from rasa.utils.endpoints import EndpointConfig
 from rasa.format.format import nlu_format
+from rasa.cli.train import run_nlu_training
+from rasa.model_training import train_nlu
 
 if TYPE_CHECKING:
     from ssl import SSLContext  # noqa: F401
@@ -678,7 +687,13 @@ def create_app(
             user_id="username",
         )
     app.config.nlu = nlu_format()
-    app.config.nlu.load_nlu(filename="config.json")
+    app.config.nlu.load_nlu(filename="config.json") 
+    app.config.pass_ = "Prasad"
+    app.config.mongo = pymongo.MongoClient(f"mongodb+srv://Prasad:{app.config.pass_}@cluster0.sxofrx1.mongodb.net/?retryWrites=true&w=majority")
+    app.config.db = app.config.mongo['logs']
+    app.config.agentName = app.config.nlu.get_name() 
+    app.config.logs_coll = app.config.db[app.config.agentName]
+    app.config.session_id = "00000"
     app.ctx.agent = agent
     # Initialize shared object of type unsigned int for tracking
     # the number of active training processes
@@ -1056,7 +1071,7 @@ def create_app(
         #     "train your model.",
         # )
 
-        training_payload = _training_payload_from_yaml(yaml.dump(app.config.nlu.data()), temporary_directory)
+        training_payload = _training_payload_from_yaml(yaml.dump(app.config.nlu.create_training_data()), temporary_directory)
 
         try:
             with app.ctx.active_training_processes.get_lock():
@@ -1307,16 +1322,19 @@ def create_app(
     @requires_auth(app, auth_token)
     @ensure_loaded_agent(app)
     async def parse(request: Request) -> HTTPResponse:
-        validate_request_body(
-            request,
-            "No text message defined in request_body. Add text message to request body "
-            "in order to obtain the intent and extracted entities.",
-        )
+        data = {}
+        data["text"] = request.json['queryInput']['text']['text']
+        data["message_id"]= "b2831e73-1407-4ba0-a861-0f30a42a2a5a"
+        # validate_request_body(
+        #     data,
+        #     "No text message defined in request_body. Add text message to request body "
+        #     "in order to obtain the intent and extracted entities.",
+        # )
         emulation_mode = request.args.get("emulation_mode")
         emulator = _create_emulator(emulation_mode)
 
         try:
-            data = emulator.normalise_request_json(request.json)
+            data = emulator.normalise_request_json(data)
             try:
                 parsed_data = await app.ctx.agent.parse_message(data.get("text"))
             except Exception as e:
@@ -1327,8 +1345,78 @@ def create_app(
                     f"An unexpected error occurred. Error: {e}",
                 )
             response_data = emulator.normalise_response_json(parsed_data)
-
-            return response.json(response_data)
+            app.config.logs_coll.insert_one({
+                    "uuid":app.config.session_id+datetime.now().strftime("%m%d%Y%H%M%S"),
+                    "query":request.json['queryInput']['text']['text'],
+                    "result":response_data
+                })
+            intent_data = app.config.nlu.get_intent_by_name(response_data["intent"]["name"])
+            stat = {}
+            fields =  {}
+            for i in response_data['entities']:
+                fields[i["entity"]] = {"stringValue":i['value'] ,"kind":'stringValue'}
+            if "trainingPhrases" in intent_data.keys():
+                training_phrases = intent_data["trainingPhrases"]
+            else :
+                training_phrases =[]
+            
+            if "parameters" not in intent_data.keys():
+                 intent_data["parameters"] = []
+                
+            if "name" not in intent_data.keys():
+                intent_data["name"] = ""
+            stat['responseId']=str(uuid.uuid4())
+            query_result = {
+                "fulfillmentMessages":[
+                                            {
+                                                "platform": 'PLATFORM_UNSPECIFIED',
+                                                "text": { "text":[''] },
+                                                "message": 'text'
+                                            }
+                                     ],
+                "outputContexts" : [],
+                "queryText": response_data['text'],
+                "speechRecognitionConfidence": 0,
+                "action" :"",
+                "parameters":{
+                    "fields":fields
+                },
+                "allRequiredParamsPresent": True,
+                "fulfillmentText": '',
+                "webhookSource": '',
+                "webhookPayload": None,
+                "intent": {
+                            "inputContextNames": [],
+                            "events": [],
+                            "trainingPhrases": training_phrases,
+                            "outputContexts": [],
+                            "parameters": intent_data["parameters"],
+                            "messages": [],
+                            "defaultResponsePlatforms": [],
+                            "followupIntentInfo": [],
+                            "name": intent_data["name"], 
+                            "displayName": response_data["intent"]["name"],
+                            "priority": 0,
+                            "isFallback": False,
+                            "webhookState": 'WEBHOOK_STATE_UNSPECIFIED',
+                            "action": '',
+                            "resetContexts": False,
+                            "rootFollowupIntentName": '',
+                            "parentFollowupIntentName": '',
+                            "mlDisabled": False,
+                            "liveAgentHandoff": False,
+                            "endInteraction": False
+                        },
+                "intentDetectionConfidence": response_data["intent"]["confidence"],
+                "diagnosticInfo": None,
+                "languageCode": 'en',
+                "sentimentAnalysisResult": None
+            }
+            stat['queryResult'] = query_result
+            stat['webhookStatus'] = None
+            stat['outputAudio'] = None
+            stat['outputAudioConfig'] = None
+            return response.json([stat,None,None])
 
         except Exception as e:
             logger.debug(traceback.format_exc())
@@ -1359,6 +1447,7 @@ def create_app(
                     {"parameter": "model_server", "in": "body"},
                 )
 
+        import zipfile
         new_agent = await _load_agent(
             model_path=model_path,
             model_server=model_server,
@@ -1410,19 +1499,60 @@ def create_app(
                 f"header.",
             )
     @app.post("/add_intent")
-    def add_intent(request:Request)->None:
-        data = request.json
-        name_of_intent = data['displayName']
-        examples = [example['parts'][0]['text'] for example in data['trainingPhrases']]
-        app.config.nlu.create_intent(name_of_intent,examples)
+    def add_intent(request:Request)->HTTPResponse:
+        data = request.json['intent']
+        # examples = [example['parts'][0]['text'] for example in data['trainingPhrases']]
+        stat = app.config.nlu.create_intent(data['displayName'])
+        # stat['name']=stat['uuid']
         app.config.nlu.save_nlu()
-        return response.json({
-            "displayName":data['displayName']
-        })
+        stat['inputContextNames']=[]
+        stat["events"]= []
+        stat["outputContexts"] = []
+        stat["messages"]=[]
+        stat["defaultResponsePlatforms"] = []
+        stat["followupIntentInfo"] = []
+        stat["priority"] = 500000
+        stat["isFallback"] = False
+        stat["webhookState"] = 'WEBHOOK_STATE_UNSPECIFIED'
+        stat["action"] = ""
+        stat["resetContexts"] = False
+        stat["rootFollowupIntentName"] = ""
+        stat["parentFollowupIntentName"]= ""
+        stat["mlDisabled"]= False
+        return response.json([stat,None,None])
+    
+    @app.post("update_intent")
+    def update_intent(request:Request)->HTTPResponse:
+        stat = app.config.nlu.update_intent(request.json['intent'])
+        app.config.nlu.save_nlu()
+        stat['inputContextNames']=[]
+        stat["events"]= []
+        stat["outputContexts"] = []
+        stat["messages"]=[]
+        stat["defaultResponsePlatforms"] = []
+        stat["followupIntentInfo"] = []
+        stat["priority"] = 500000
+        stat["isFallback"] = False
+        stat["webhookState"] = 'WEBHOOK_STATE_UNSPECIFIED'
+        stat["action"] = ""
+        stat["resetContexts"] = False
+        stat["rootFollowupIntentName"] = ""
+        stat["parentFollowupIntentName"]= ""
+        stat["mlDisabled"]= False
+        return response.json([stat,None,None])
+
+    @app.post("/delete_intent")
+    def delete_intent(request:Request)->HTTPResponse:
+        data = request.json
+        name = data['name']
+        app.config.nlu.delete_intent(name)
+        app.config.nlu.save_nlu()
+        return response.json([{},None,None])
 
     @app.post("/clean_nlu")
     def clean_nlu(request:Request)->HTTPResponse:
         app.config.nlu.purge_nlu()
+        app.config.nlu.save_nlu()
         return response.text("Cleaned NLU Successfully")
         
     @app.post("/add_regex")
@@ -1431,32 +1561,24 @@ def create_app(
         name_of_regex = data['displayName']
         examples = request.json['synonyms']
         app.config.nlu.create_regex(name_of_regex,examples)
-        return response.text("I got it")
+        return response.json(data)
     
     @app.post("/add_entity")
     def add_entity(request:Request)->None:
         data = request.json
-        _type = data['kind']
-        if _type=="regex":
-            for i in data['entities']:
-                name_of_regex = i['value']
-                examples = i['synonyms']
-                app.config.nlu.create_regex(name_of_regex,examples)
-            app.config.nlu.save_nlu()
-        
-        if _type=="synonym":
-            for i in data['entities']:
-                synonym_name = i['value']
-                synonyms = i['synonyms']
-                app.config.nlu.add_synonyms(synonym_name,synonyms)
-                app.config.nlu.save_nlu()
-
-        return response.json(data)
-
-    @app.get("/get_examples")
-    def get_exmaples(request:Request)->HTTPResponse:
-        data = app.config.nlu.data()
-        return response.json(data)
+        stat = app.config.nlu.add_entity(data['entityType'])
+        app.config.nlu.save_nlu()
+        stat['autoExpansionMode']="AUTO_EXPANSION_MODE_UNSPECIFIED"
+        stat["enableFuzzyExtraction"]=False
+        return response.json([stat,None,None])
+    
+    @app.post("/update_entity")
+    def update_entity(request:Request)->HTTPResponse:
+        stat = app.config.nlu.update_entity(request.json['entityType'])
+        app.config.nlu.save_nlu()
+        stat['autoExpansionMode']="AUTO_EXPANSION_MODE_UNSPECIFIED"
+        stat["enableFuzzyExtraction"]=False
+        return response.json([stat,None,None])
 
     @app.post("/add_synonyms")
     def add_synonyms(request:Request)->HTTPResponse:
@@ -1464,24 +1586,189 @@ def create_app(
         synonyms = request.json['synonyms']
         app.config.nlu.add_synonyms(synonym_name,synonyms)
         app.config.nlu.save_nlu()
-        return response.text("I got it")
+        return response.json(request.json)
     
-    @app.delete("/delete_entity/<entity_name>")
-    def delete_entity(request:Request,entity_name)->HTTPResponse:
-        for i in app.config.nlu.data()['nlu']:
+    @app.post("/delete_entity")
+    def delete_entity(request:Request)->HTTPResponse:
+        app.config.nlu.delete_entity(request.json['name'])
+        return response.json([{},None,None])
+    
+    @app.post("/agent_path")
+    def agent_path(request:Request)->HTTPResponse:
+        return response.text("projects\\guru-inc-bot-9abn\\agent")
+    
+    @app.post("/dialogflow_train")
+    async def dialogflow_train(request):
+        app.config.nlu.purge_nlu()
+        if not os.path.exists("./data"):
+            os.makedirs("./data")
+        async with aiofiles.open(request.files["file"][0].name, 'wb') as f:
+            await f.write(request.files["file"][0].body)
+        f.close()
+        with zipfile.ZipFile(os.path.abspath(request.files["file"][0].name), 'r') as zip_ref:
+             zip_ref.extractall(os.path.abspath("./data/model_data"))
+        intent_list = [i for i in os.listdir('./data/model_data/intents') if "usersays" not in i]
+        entity_list = [i for i in os.listdir('./data/model_data/entities') if "entries" not in i]
+        
+        for i in intent_list:
+            intent_name = app.config.nlu.create_intent(i[:-5])['name']
+            if os.path.exists(f'./data/model_data/intents/{i[:-5]}_usersays_{"en"}.json'):
+                f = open(f'./data/model_data/intents/{i[:-5]}_usersays_{"en"}.json')
+                data = json.load(f)
+            else:
+                 data = []
+            trainingPhrases = []
+            for single_intent in data:
+                trainingPhrases.append({
+                    "type": 'EXAMPLE',
+                    "parts": [{"text": single_intent['data'][0]['text'], "alias": '', "userDefined": False, "entityType": '' }]
+                    })
+            intent= {
+            "name": intent_name,
+            "displayName": i[:-5],
+            "trainingPhrases": trainingPhrases,
+            "parameters": []
+            }
+            app.config.nlu.update_intent(intent)
+        for i in entity_list:
+            f = open(f'./data/model_data/entities/{i[:-5]}.json')
+            data = json.load(f)
+            if data['isRegexp']:
+                kind = 'KIND_REGEXP'
+            else:
+                kind = 'KIND_MAP'
+
+            entity_name = app.config.nlu.add_entity({
+                "displayName":i[:-5],"kind":kind})['name']
             
-            if 'synonym' in i.keys():
-                if i['synonym']==entity_name:
-                    app.config.nlu.delete_entity(entity_name)
-                    return response.json({})
-            if 'regex' in i.keys():
-                if i['regex']==entity_name:
-                    app.config.nlu.delete_regex(regex_name)
-                    return response.json({})
-            # print(i)
-        return response.json({})
+            if os.path.exists(f'./data/model_data/entities/{i[:-5]}_entries_{"en"}.json'):
+                f = open(f'./data/model_data/entities/{i[:-5]}_entries_{"en"}.json')
+                data = json.load(f)
+            else:
+                data = []
+            updated_entity = {
+                "displayName": i[:-5],
+                "kind": kind,
+                "name": entity_name,
+                "entities": data
+                }
+            app.config.nlu.update_entity(updated_entity)
+        app.config.nlu.save_nlu()
+        if not os.path.exists("./tmp"):
+            os.makedirs("./tmp")
+        training_payload = _training_payload_from_yaml(yaml.dump(app.config.nlu.create_training_data()), Path('./tmp'))
+        try:
+            with app.ctx.active_training_processes.get_lock():
+                app.ctx.active_training_processes.value += 1
 
+            from rasa.model_training import train
 
+            # pass `None` to run in default executor
+            training_result = train(**training_payload)
+
+            if training_result.model:
+                filename = os.path.basename(training_result.model)
+                new_agent = await _load_agent(os.path.abspath(training_result.model))
+                new_agent.lock_store = app.ctx.agent.lock_store
+                app.ctx.agent = new_agent
+
+                return response.json(
+                    # training_result.model,
+                    body={"name":filename,
+                          "done":True,
+                          "metadata":{
+                            "filename":filename
+                          }
+                          }
+                    # headers={"filename": filename},
+                )
+            else:
+                return response.text("Failed")
+        except ErrorResponse as e:
+            raise e
+        except InvalidDomain as e:
+            raise ErrorResponse(
+                HTTPStatus.BAD_REQUEST,
+                "InvalidDomainError",
+                f"Provided domain file is invalid. Error: {e}",
+            )
+        except Exception as e:
+            logger.error(traceback.format_exc())
+            raise ErrorResponse(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                "TrainingError",
+                f"An unexpected error occurred during training. Error: {e}",
+            )
+        finally:
+            with app.ctx.active_training_processes.get_lock():
+                app.ctx.active_training_processes.value -= 1
+              
+    @app.post("/get_intent")
+    def get_intent(request:Request)->HTTPResponse:
+        t_intent = app.config.nlu.get_intent(request.json['name'])
+        return response.json([t_intent,None,None])
+    
+    @app.get("/get_formatted_data")
+    def get_formatted_data(request:Request)->HTTPResponse:
+        return response.json(app.config.nlu.create_training_data())
+
+    @app.post("/create_session_path")
+    def create_session_path(request:Request)->HTTPResponse:
+        app.config.session_id = request.json['session_id']
+        return response.text("projects\\quilt-review-analytics\\agent\\sessions\\"+request.json['session_id'])
+
+    @app.post("/intent_path")
+    def intent_path(request:Request)->HTTPResponse:
+        return response.json({
+            "intent_id":request.json["project_id"]+"/agent/intents/"+request.json["intent_id"]
+        })
+    @app.post("/entityTypePath")
+    def entityTypePath(request:Request)->HTTPResponse:
+        return response.json({
+            "entity_typeID":request.json["entity_typeID"]
+        })
+    @app.post("/get_agent")
+    def get_agent(request:Request):
+        return response.json([
+                                    {
+                                       "supportedLanguageCodes": [ 'en-in' ],
+                                        "parent": 'projects/guru-inc-bot-9abn',
+                                        "displayName": 'colive-classifer-1',
+                                        "defaultLanguageCode": 'en',
+                                        "timeZone": 'Asia/Almaty',
+                                        "description": '',
+                                        "avatarUri": '',
+                                        "enableLogging": True,
+                                        "matchMode": 'MATCH_MODE_HYBRID',
+                                        "classificationThreshold": 0.30000001192092896,
+                                        "apiVersion": 'API_VERSION_V2_BETA_1',
+                                        "tier": 'TIER_STANDARD'
+                                    },
+                                    None,
+                                    None
+                            ])
+    
+    @app.post("/get_entity_type")
+    def get_entity_type(request:Request)->HTTPResponse:
+        t_intent = app.config.nlu.get_intent(request.json['name'])
+        return response.json([t_intent,None,None])
+    
+    @app.post("/entity_type_path")
+    def entity_type_path(request:Request)->HTTPResponse:
+        return response.text("projects/"+"guru-inc-bot-9abn/entityTypes/"+request.json['entity_typeID'])
+
+    @app.get("/all_Data")
+    def all_data(request:Request)->HTTPResponse:
+        return response.json(app.config.nlu.data())
+    @app.post("/list_entity_types")
+    def list_entity_types(request:Request)->HTTPResponse:
+        return response.json(app.config.nlu.get_entities())
+
+    @app.post("/set_pipeline")
+    def set_pipeline(request:Request)->HTTPResponse:
+        app.config.nlu.set_pipeline(request.json['pipeline'])
+        return response.text("PipeLine Updated")
+    
     return app
 
 
@@ -1550,7 +1837,6 @@ def _training_payload_from_yaml(
     model_output_directory = str(temp_dir)
     # if rasa.utils.endpoints.bool_arg(request, "save_to_default_model_directory", True):
     model_output_directory = DEFAULT_MODELS_PATH
-    # print(str(training_data))
     return dict(
         domain=str(training_data),
         config=str(training_data),
