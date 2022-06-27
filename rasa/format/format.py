@@ -76,7 +76,8 @@ class nlu_format:
                                 }
                             ],
                             "rules": [],
-                            "stories": []
+                            "stories": [],
+                            "lookup":[]
                       }
     def data(self):
         return self.format
@@ -151,6 +152,7 @@ class nlu_format:
       arr = []
       for i in self.format['nlu']:
         if i['displayName']==synonym:
+          return i
           for j in i['entities']:
             for k in j['synonyms']:
               arr.append(k)
@@ -160,9 +162,12 @@ class nlu_format:
       if type == "synonym":
         for entity in self.format['entities']:
           if self.get_examples(entity):
-            for synonym in self.get_examples(entity):
-              if synonym in example:
-                example = annotate_example(example, synonym , entity, synonym)
+            i = self.get_examples(entity)
+            for j in i['entities']:
+              for k in sorted(j['synonyms'],key=len,reverse=True):
+                if k in example.split() or ( k in example and len(k.split())>1 )and( len(re.findall(r'\[.*\]\{.*\}', example))==0) :
+                  example = annotate_example(example, k , entity, j['value'])
+                  return example
         return example
 
       if type == "regex":
@@ -175,10 +180,12 @@ class nlu_format:
         
         for reg in regex_list:
           regex_example_list = self.get_examples(reg)
-          for reg_code in regex_example_list:
-            regex_search = re.search(reg_code, example)
-            if regex_search is not None:
-              return add_regex_annotation(example,regex_search.group(), reg)
+          for reg_type in regex_example_list['entities']:
+            for reg_code in reg_type['synonyms']:
+              regex_search = re.search(reg_code, example)
+      
+              if regex_search is not None:
+                return add_regex_annotation(example,regex_search.group(), reg)
         return example
     
     def get_entities(self):
@@ -294,6 +301,9 @@ class nlu_format:
     #         example=re.sub("\(.*?\)","",example)
 
     #         return example
+    def set_pipeline(self,pipeline):
+      self.format['pipeline']=pipeline
+
 
     def delete_entity(self,name: str):
       #check in the domain first 
@@ -306,6 +316,7 @@ class nlu_format:
 
     def create_training_data(self):
       training_data = {}
+      training_data['version'] = "3.1"
       training_data['pipeline'] = self.format['pipeline']
       training_data['policies'] = self.format['policies']
       training_data['intents'] = self.format['intents']
