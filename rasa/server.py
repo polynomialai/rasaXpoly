@@ -31,6 +31,7 @@ import pymongo
 from datetime import datetime
 import json
 
+import requests
 import aiohttp
 import jsonschema
 from sanic import Sanic, response
@@ -649,6 +650,16 @@ def inject_temp_dir(f: Callable[..., Coroutine]) -> Callable:
 
     return decorated_function
 
+def train_custom_entity_cer(json_file):
+    if json_file.endswith('.json'):
+        file = open(json_file)
+        data = json.load(file)
+
+        if "pack_name" in data.keys() and "entities" in data.keys():
+            base_url = 'https://entity-extract.herokuapp.com/train_pack'
+            response = requests.post(base_url, json=data)
+        elif "agent_name" in data.keys() and "entities" in data.keys():
+            base_url = 'https://entity-extract.herokuapp.com/train_ent'
 
 def create_app(
     agent: Optional["Agent"] = None,
@@ -1071,6 +1082,13 @@ def create_app(
         #     "train your model.",
         # )
 
+        if not os.path.exists("./json_data"):
+            os.makedirs("./json_data")
+        async with aiofiles.open(request.files["file"][0].name, 'wb') as f:
+            await f.write(request.files["file"][0].body)
+        f.close()
+        train_custom_entity_cer(request.files["file"][0].name)
+
         training_payload = _training_payload_from_yaml(yaml.dump(app.config.nlu.create_training_data()), temporary_directory)
 
         try:
@@ -1332,7 +1350,7 @@ def create_app(
         # )
         emulation_mode = request.args.get("emulation_mode")
         emulator = _create_emulator(emulation_mode)
-
+                    
         try:
             data = emulator.normalise_request_json(data)
             try:
