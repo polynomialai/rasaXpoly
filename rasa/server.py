@@ -1323,7 +1323,7 @@ def create_app(
     @ensure_loaded_agent(app)
     async def parse(request: Request) -> HTTPResponse:
         data = {}
-        data["text"] = request.json['queryInput']['text']['text']
+        data["text"] = request.json['queryInput']['text']['text']   #query     
         data["message_id"]= "b2831e73-1407-4ba0-a861-0f30a42a2a5a"
         # validate_request_body(
         #     data,
@@ -1355,6 +1355,30 @@ def create_app(
             fields =  {}
             for i in response_data['entities']:
                 fields[i["entity"]] = {"stringValue":i['value'] ,"kind":'stringValue'}
+            import requests
+            example = data["text"]
+
+            url = 'https://entity-extract.herokuapp.com/hybrid'
+            myobj ={
+                "query": f"{example}",
+                "agent_name": "transo",        
+                "threshold": 90
+            }
+
+            x = requests.post(url, json= myobj )
+            req = x.json()
+            en = {}
+
+            for i in req["entities"]:
+                #print(i['entityClass'] ,'\t',i['token'])
+                # en['entity'] = i['entityClass']
+                # en['start'] = example.index(i['token'])
+                # en['end'] = example.index(i['token'])+len(i['token'])
+                # en['confidence_entity']= i['metaData']['match']/100
+                # en['value']= i['token']
+                # en['extractor']="Hybrid"
+                fields[i["entity"]].update(en)
+            
             if "trainingPhrases" in intent_data.keys():
                 training_phrases = intent_data["trainingPhrases"]
             else :
@@ -1411,7 +1435,7 @@ def create_app(
                 "diagnosticInfo": None,
                 "languageCode": 'en',
                 "sentimentAnalysisResult": None
-            }
+            }    
             stat['queryResult'] = query_result
             stat['webhookStatus'] = None
             stat['outputAudio'] = None
