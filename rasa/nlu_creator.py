@@ -1,4 +1,5 @@
 import json
+import uuid
 import os
 format = {
     "name": os.getenv('BOT_ID'),
