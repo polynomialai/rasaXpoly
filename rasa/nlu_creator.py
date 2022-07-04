@@ -1,4 +1,5 @@
 import json
+import os
 format = {
     "name": os.getenv('BOT_ID'),
     "last_trained" : None,
