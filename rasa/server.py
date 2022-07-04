@@ -1767,7 +1767,8 @@ def create_app(
 
     @app.post("/intent_path")
     def intent_path(request:Request)->HTTPResponse:
-        return response.text("projects/"+request.json["project_id"]+"/agent/intents/"+request.json["intent_id"])
+        return response.text("projects/"+f"{os.getenv('BOT_ID')}"+"/agent/intents/"+request.json["intent_id"])
+        # return response.text("projects/"+request.json["intent_id"])
     
     @app.post("/entityTypePath")
     def entityTypePath(request:Request)->HTTPResponse:

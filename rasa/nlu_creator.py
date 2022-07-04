@@ -67,7 +67,7 @@ format = {
                                   {
                                     "type": "intent",
                                     "name": f"projects/{os.getenv('BOT_ID')}/agent/intents/{str(uuid.uuid4())}",
-                                    "displayName": "agent.init",
+                                    "displayName": "agent.Initialize",
                                     "trainingPhrases": [
                                         {
                                             "type": "EXAMPLE",
