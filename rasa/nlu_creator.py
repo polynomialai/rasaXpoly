@@ -75,7 +75,7 @@ format = {
                                                 {
                                                     "text": "init",
                                                     "alias": "",
-                                                    "userDefined": false,
+                                                    "userDefined": False,
                                                     "entityType": ""
                                                 }
                                             ],
@@ -87,7 +87,7 @@ format = {
                                                 {
                                                     "text": "intialise",
                                                     "alias": "",
-                                                    "userDefined": false,
+                                                    "userDefined": False,
                                                     "entityType": ""
                                                 }
                                             ],
@@ -99,7 +99,7 @@ format = {
                                                 {
                                                     "text": "initialised",
                                                     "alias": "",
-                                                    "userDefined": false,
+                                                    "userDefined": False,
                                                     "entityType": ""
                                                 }
                                             ],
@@ -113,7 +113,7 @@ format = {
                             "stories": []
       }
 
-with open("basicBot/config.json", "w") as outfile:
+with open("./config.json", "w") as outfile:
     json.dump(format, outfile)
 
 
