@@ -1,7 +1,8 @@
 import json
 format = {
-    "name":"Dummy Agent 1",
-                            "pipeline": [
+    "name": os.getenv('BOT_ID'),
+    "last_trained" : None,
+    "pipeline": [
     {
       "name": "WhitespaceTokenizer"
     },
@@ -32,7 +33,7 @@ format = {
     },
     {
       "name": "FallbackClassifier",
-      "threshold": 0.3,
+      "threshold": 0.2,
       "ambiguity_threshold": 0.1
     }
   ],
@@ -50,7 +51,7 @@ format = {
     }
   ],
                             "policies": [],
-                            "intents": [],
+                            "intents": ["agent.init"],
                             "entities": [],
                             "slots": {},
                             "actions": [],
@@ -60,9 +61,58 @@ format = {
                             "session_config": {
                                 "session_expiration_time": 60
                             },
-                            "nlu": [],
+                            "nlu": [
+                                  {
+                                    "type": "intent",
+                                    "name": f"projects/{os.getenv('BOT_ID')}/agent/intents/{str(uuid.uuid4())}",
+                                    "displayName": "agent.init",
+                                    "trainingPhrases": [
+                                        {
+                                            "type": "EXAMPLE",
+                                            "parts": [
+                                                {
+                                                    "text": "init",
+                                                    "alias": "",
+                                                    "userDefined": false,
+                                                    "entityType": ""
+                                                }
+                                            ],
+                                            "name": str(uuid.uuid4())
+                                        },
+                                        {
+                                            "type": "EXAMPLE",
+                                            "parts": [
+                                                {
+                                                    "text": "intialise",
+                                                    "alias": "",
+                                                    "userDefined": false,
+                                                    "entityType": ""
+                                                }
+                                            ],
+                                            "name": str(uuid.uuid4())
+                                        },
+                                        {
+                                            "type": "EXAMPLE",
+                                            "parts": [
+                                                {
+                                                    "text": "initialised",
+                                                    "alias": "",
+                                                    "userDefined": false,
+                                                    "entityType": ""
+                                                }
+                                            ],
+                                            "name": str(uuid.uuid4())
+                                        }
+                                    ],
+                                    "parameters":[]
+                                }
+                            ],
                             "rules": [],
                             "stories": []
-                      }
+      }
+
 with open("basicBot/config.json", "w") as outfile:
     json.dump(format, outfile)
+
+
+    

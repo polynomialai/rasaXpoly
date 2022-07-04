@@ -1,8 +1,10 @@
 import json
+import os
 import re
 import datetime
 import uuid 
 from rasa.format.annotator import annotate_example,add_regex_annotation
+
 class nlu_format:
     def __init__(self) -> None:
         self.format = {
@@ -118,7 +120,7 @@ class nlu_format:
         self.format['intents'].append(displayName) 
         dic = {
             "type":"intent",
-            "name":"projects/guru-inc-bot-9abn/agent/intents/"+str(uuid.uuid4()),
+            "name":f"projects/{os.getenv('BOT_ID')}/agent/intents/"+str(uuid.uuid4()),
             "displayName":displayName,
             "trainingPhrases": [],
             "parameters":[]
@@ -242,7 +244,7 @@ class nlu_format:
         self.format["entities"].append(entity['displayName'])
         dic = {
             "type":"entity",
-            "name":"projects/guru-inc-bot-9abn/agent/entityTypes/"+str(uuid.uuid4()),
+            "name":f"projects/{os.getenv('BOT_ID')}/agent/entityTypes/"+str(uuid.uuid4()),
             "entities": [],
             "displayName": entity['displayName'],
             "kind": entity['kind']

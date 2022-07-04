@@ -30,6 +30,7 @@ import yaml
 import pymongo
 from datetime import datetime
 import json
+from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
 
 import requests
 import aiohttp
@@ -698,14 +699,33 @@ def create_app(
             user_id="username",
         )
     app.config.nlu = nlu_format()
-    app.config.nlu.load_nlu(filename="config.json") 
     app.config.pass_ = "Prasad"
     app.config.mongo = pymongo.MongoClient(f"mongodb+srv://Prasad:{app.config.pass_}@cluster0.sxofrx1.mongodb.net/?retryWrites=true&w=majority")
     app.config.db = app.config.mongo['logs']
     app.config.agentName = app.config.nlu.get_name() 
     app.config.logs_coll = app.config.db[app.config.agentName]
     app.config.session_id = "00000"
-    app.ctx.agent = agent
+    connect_str = 'DefaultEndpointsProtocol=https;AccountName=aspectengineeringbackup;AccountKey=o0sdvUuxZtWm//m8LWWFUmGFbL45Lyrt1q9ohrH3MFUQROqcjk5bXFP4vjyWamqhV1Tdi2chktOi+ASt68UIiw==;EndpointSuffix=core.windows.net'
+    app.config.blob_service_client = BlobServiceClient.from_connection_string(connect_str)
+    
+    blob_client = app.config.blob_service_client.get_container_client(container= "rasa-files")
+    print(f"{os.getenv('BOT_ID')}/config.json")
+    with open(os.path.abspath("./config.json"), "wb") as download_file:
+         download_file.write(blob_client.download_blob(f"{os.getenv('BOT_ID')}/config.json").readall())
+    app.config.nlu.load_nlu(filename="config.json") 
+
+    if app.config.nlu.format['last_trained']:
+        print("Downloading model",app.config.nlu.format['last_trained'])
+        with open(os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"), "wb") as download_file:
+            print("Downloading to",os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"))
+            download_file.write(blob_client.download_blob(f"{os.getenv('BOT_ID')}/{app.config.nlu.format['last_trained']}").readall())
+        # filename = os.path.basename(training_result.model)
+        # new_agent = await _load_agent(os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"))
+        # new_agent.lock_store = app.ctx.agent.lock_store
+        # app.ctx.agent = new_agent
+
+    
+    
     # Initialize shared object of type unsigned int for tracking
     # the number of active training processes
     app.ctx.active_training_processes = multiprocessing.Value("I", 0)
@@ -1082,12 +1102,12 @@ def create_app(
         #     "train your model.",
         # )
 
-        if not os.path.exists("./json_data"):
-            os.makedirs("./json_data")
-        async with aiofiles.open(request.files["file"][0].name, 'wb') as f:
-            await f.write(request.files["file"][0].body)
-        f.close()
-        train_custom_entity_cer(request.files["file"][0].name)
+        # if not os.path.exists("./json_data"):
+        #     os.makedirs("./json_data")
+        # async with aiofiles.open(request.files["file"][0].name, 'wb') as f:
+        #     await f.write(request.files["file"][0].body)
+        # f.close()
+        # train_custom_entity_cer(request.files["file"][0].name)
 
         training_payload = _training_payload_from_yaml(yaml.dump(app.config.nlu.create_training_data()), temporary_directory)
 
@@ -1105,13 +1125,23 @@ def create_app(
                 new_agent = await _load_agent(os.path.abspath(training_result.model))
                 new_agent.lock_store = app.ctx.agent.lock_store
                 app.ctx.agent = new_agent
+                blob_client = app.config.blob_service_client.get_blob_client(container="rasa-files", blob=f"{os.getenv('BOT_ID')}/{filename}")
+                
+                with open(os.path.abspath(training_result.model), "rb") as data:
+                    blob_client.upload_blob(data)
+                app.config.nlu.format['last_trained'] = filename
+                app.config.nlu.save_nlu()
+                blob_client = app.config.blob_service_client.get_blob_client(container="rasa-files", blob=f"{os.getenv('BOT_ID')}/config.json")
+                with open(os.path.abspath("./config.json"), "rb") as data:
+                    blob_client.upload_blob(data,overwrite=True)
 
                 return response.json(
                     # training_result.model,
                     body={"name":filename,
                           "done":True,
                           "metadata":{
-                            "filename":filename
+                            "filename":filename,
+                            "stored":True
                           }
                           }
                     # headers={"filename": filename},
@@ -1342,7 +1372,7 @@ def create_app(
     async def parse(request: Request) -> HTTPResponse:
         data = {}
         data["text"] = request.json['queryInput']['text']['text']
-        data["message_id"]= "b2831e73-1407-4ba0-a861-0f30a42a2a5a"
+        data["message_id"]= str(uuid.uuid4())
         # validate_request_body(
         #     data,
         #     "No text message defined in request_body. Add text message to request body "
@@ -1613,7 +1643,7 @@ def create_app(
     
     @app.post("/agent_path")
     def agent_path(request:Request)->HTTPResponse:
-        return response.text("projects\\guru-inc-bot-9abn\\agent")
+        return response.text(f"projects\\{os.getenv('BOT_ID')}\\agent")
     
     @app.post("/dialogflow_train")
     async def dialogflow_train(request):
@@ -1733,24 +1763,21 @@ def create_app(
     @app.post("/create_session_path")
     def create_session_path(request:Request)->HTTPResponse:
         app.config.session_id = request.json['session_id']
-        return response.text("projects\\quilt-review-analytics\\agent\\sessions\\"+request.json['session_id'])
+        return response.text(f"projects\\{os.getenv('BOT_ID')}\\agent\\sessions\\"+request.json['session_id'])
 
     @app.post("/intent_path")
     def intent_path(request:Request)->HTTPResponse:
-        return response.json({
-            "intent_id":request.json["project_id"]+"/agent/intents/"+request.json["intent_id"]
-        })
+        return response.text("projects/"+request.json["project_id"]+"/agent/intents/"+request.json["intent_id"])
+    
     @app.post("/entityTypePath")
     def entityTypePath(request:Request)->HTTPResponse:
-        return response.json({
-            "entity_typeID":request.json["entity_typeID"]
-        })
+        return response.text("projects/"+request.json["entity_typeID"])
     @app.post("/get_agent")
     def get_agent(request:Request):
         return response.json([
                                     {
                                        "supportedLanguageCodes": [ 'en-in' ],
-                                        "parent": 'projects/guru-inc-bot-9abn',
+                                        "parent": f'projects/{os.enviorn("BOT_ID")}',
                                         "displayName": 'colive-classifer-1',
                                         "defaultLanguageCode": 'en',
                                         "timeZone": 'Asia/Almaty',
@@ -1773,7 +1800,7 @@ def create_app(
     
     @app.post("/entity_type_path")
     def entity_type_path(request:Request)->HTTPResponse:
-        return response.text("projects/"+"guru-inc-bot-9abn/entityTypes/"+request.json['entity_typeID'])
+        return response.text("projects/"+f"{os.getenv('BOT_ID')}/agent/entityTypes/"+request.json['entity_typeID'])
 
     @app.get("/all_Data")
     def all_data(request:Request)->HTTPResponse:
