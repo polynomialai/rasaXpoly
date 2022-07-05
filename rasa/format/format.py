@@ -154,22 +154,24 @@ class nlu_format:
       arr = []
       for i in self.format['nlu']:
         if i['displayName']==synonym:
-          return i
-          for j in i['entities']:
-            for k in j['synonyms']:
-              arr.append(k)
+            return i
+          # for j in i['entities']:
+          #   for k in j['synonyms']:
+          #     arr.append(k)
       return arr
 
     def annotate(self,example, type="synonym"):
       if type == "synonym":
-        for entity in self.format['entities']:
-          if self.get_examples(entity):
-            i = self.get_examples(entity)
-            for j in i['entities']:
-              for k in sorted(j['synonyms'],key=len,reverse=True):
-                if k in example.split() or ( k in example and len(k.split())>1 )and( len(re.findall(r'\[.*\]\{.*\}', example))==0) :
-                  example = annotate_example(example, k , entity, j['value'])
-                  return example
+        for entity in self.format['nlu']:
+          if entity["type"]=="entity":
+            if entity["kind"]=="KIND_MAP":
+              if self.get_examples(entity):
+                i = self.get_examples(entity)
+                for j in i['entities']:
+                  for k in sorted(j['synonyms'],key=len,reverse=True):
+                    if k in example.split() or ( k in example and len(k.split())>1 )and( len(re.findall(r'\[.*\]\{.*\}', example))==0) :
+                      example = annotate_example(example, k , entity, j['value'])
+                      return example
         return example
 
       if type == "regex":
@@ -185,7 +187,6 @@ class nlu_format:
           for reg_type in regex_example_list['entities']:
             for reg_code in reg_type['synonyms']:
               regex_search = re.search(reg_code, example)
-      
               if regex_search is not None:
                 return add_regex_annotation(example,regex_search.group(), reg)
         return example
@@ -279,7 +280,7 @@ class nlu_format:
             return i
       return {}
     ## Legacy Code                 
-    # def remove_entity_annotation(self,entity_name:str, example:str):
+    # def remove_entity_annotation(self,entity_str, example:str):
         
     # # expecting example as: how much do I have on my [credit card account]{"entity": "account", "value": "credit"}
   
@@ -292,7 +293,7 @@ class nlu_format:
 
     #         return example
 
-    # def remove_regex_annotation(self,regex_name:str, example:str):
+    # def remove_regex_annotation(self,regex_str, example:str):
 
     # # expecting example as how much do I have on my [credit card account](account_number)
     #     re_search = re.search(regex_name,example)

@@ -53,7 +53,7 @@ format = {
     }
   ],
                             "policies": [],
-                            "intents": ["agent.init"],
+                            "intents": ["agent.Initialize"],
                             "entities": [],
                             "slots": {},
                             "actions": [],
