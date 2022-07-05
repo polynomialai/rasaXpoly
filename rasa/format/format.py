@@ -151,10 +151,8 @@ class nlu_format:
             return i  
 
     def get_examples(self,synonym):
-      print(synonym)
       for i in self.format['nlu']:
         if i['displayName']==synonym:
-            print(i)
             return i
           # for j in i['entities']:
           #   for k in j['synonyms']:
@@ -168,10 +166,9 @@ class nlu_format:
             if entity["kind"]=="KIND_MAP":
               if self.get_examples(entity['displayName']):
                 i = self.get_examples(entity['displayName'])
-                print(i)
                 for j in i['entities']:
                   for k in sorted(j['synonyms'],key=len,reverse=True):
-                    if k in example.split() or (k in example and len(k.split())>1 )and( len(re.findall(r'\[.*\]\{.*\}', example))==0) :
+                    if k in example.lower().split() or (k in example and len(k.split())>1 )and( len(re.findall(r'\[.*\]\{.*\}', example))==0) :
                       example = annotate_example(example, k , entity['displayName'], j['value'])
                       return example
         return example
@@ -340,8 +337,17 @@ class nlu_format:
           nlu_item['intent'] = i['displayName']
           data ="- "
           for trainingPhrase in i['trainingPhrases']:
-            example = self.annotate(trainingPhrase["parts"][0]["text"])
-            example = self.annotate(example,type="regex")
+            example = ""
+            for part in trainingPhrase["parts"]:
+              if part['entityType'] is "":
+                text = self.annotate(part["text"])
+                text = self.annotate(text,type="regex")
+              else:
+                # text = annotate_example(part["text"],part["text"], part['entityType'], part['entityType'])
+                text = self.annotate(part["text"])
+                text = self.annotate(text,type="regex")
+              example+=text
+
             data = data + example +"\n- "
           data = data[:-3]
           nlu_item['examples'] = data

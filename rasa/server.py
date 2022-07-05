@@ -714,16 +714,15 @@ def create_app(
          download_file.write(blob_client.download_blob(f"{os.getenv('BOT_ID')}/config.json").readall())
     app.config.nlu.load_nlu(filename="config.json") 
 
-    if app.config.nlu.format['last_trained']:
+    if app.config.nlu.format['last_trained']!='InitialModel.tar.gz':
         print("Downloading model",app.config.nlu.format['last_trained'])
         with open(os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"), "wb") as download_file:
             print("Downloading to",os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"))
             download_file.write(blob_client.download_blob(f"{os.getenv('BOT_ID')}/{app.config.nlu.format['last_trained']}").readall())
-        # filename = os.path.basename(training_result.model)
-        # new_agent = await _load_agent(os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"))
-        # new_agent.lock_store = app.ctx.agent.lock_store
-        # app.ctx.agent = new_agent
-
+    else:
+        with open(os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"), "wb") as download_file:
+            print("Downloading to",os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"))
+            download_file.write(blob_client.download_blob(f"{app.config.nlu.format['last_trained']}").readall())
     
     
     # Initialize shared object of type unsigned int for tracking
