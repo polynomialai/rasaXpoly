@@ -151,9 +151,10 @@ class nlu_format:
             return i  
 
     def get_examples(self,synonym):
-      arr = []
+      print(synonym)
       for i in self.format['nlu']:
         if i['displayName']==synonym:
+            print(i)
             return i
           # for j in i['entities']:
           #   for k in j['synonyms']:
@@ -165,12 +166,13 @@ class nlu_format:
         for entity in self.format['nlu']:
           if entity["type"]=="entity":
             if entity["kind"]=="KIND_MAP":
-              if self.get_examples(entity):
-                i = self.get_examples(entity)
+              if self.get_examples(entity['displayName']):
+                i = self.get_examples(entity['displayName'])
+                print(i)
                 for j in i['entities']:
                   for k in sorted(j['synonyms'],key=len,reverse=True):
-                    if k in example.split() or ( k in example and len(k.split())>1 )and( len(re.findall(r'\[.*\]\{.*\}', example))==0) :
-                      example = annotate_example(example, k , entity, j['value'])
+                    if k in example.split() or (k in example and len(k.split())>1 )and( len(re.findall(r'\[.*\]\{.*\}', example))==0) :
+                      example = annotate_example(example, k , entity['displayName'], j['value'])
                       return example
         return example
 
