@@ -709,21 +709,46 @@ def create_app(
     app.config.blob_service_client = BlobServiceClient.from_connection_string(connect_str)
     
     blob_client = app.config.blob_service_client.get_container_client(container= "rasa-files")
-    print(f"{os.getenv('BOT_ID')}/config.json")
-    with open(os.path.abspath("./config.json"), "wb") as download_file:
-         download_file.write(blob_client.download_blob(f"{os.getenv('BOT_ID')}/config.json").readall())
+    try:
+        print(f"Downloading {os.getenv('BOT_ID')}/config.json")
+        with open("config.json", "r") as input_json, open("temp_config.json", "w") as to_json:
+            to_json.write(input_json.read())
+        with open(os.path.abspath("./config.json"), "wb") as download_file:
+            download_file.write(blob_client.download_blob(f"{os.getenv('BOT_ID')}/config.json").readall())
+        os.remove("temp_config.json") 
+    except:
+        print("Cannot download config.json,using local version")
+        with open("temp_config.json", "r") as input_json, open("config.json", "w") as to_json:
+            to_json.write(input_json.read())
+        os.remove("temp_config.json")
+
     app.config.nlu.load_nlu(filename="config.json") 
 
     if app.config.nlu.format['last_trained']!='InitialModel.tar.gz':
-        print("Downloading model",app.config.nlu.format['last_trained'])
-        with open(os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"), "wb") as download_file:
-            print("Downloading to",os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"))
-            download_file.write(blob_client.download_blob(f"{os.getenv('BOT_ID')}/{app.config.nlu.format['last_trained']}").readall())
+        try:
+            print("Downloading model",app.config.nlu.format['last_trained'])
+            with open(os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"), "wb") as download_file:
+                print("Downloading to",os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"))
+                download_file.write(blob_client.download_blob(f"{os.getenv('BOT_ID')}/{app.config.nlu.format['last_trained']}").readall())
+        except:
+            print("Cannot download initial model\n training from scratch")
+            from rasa.model_training import train
+            if not os.path.exists("./tmp"):
+                os.makedirs("./tmp")
+            training_payload = _training_payload_from_yaml(yaml.dump(app.config.nlu.create_training_data()), Path('./tmp'))
+            training_result = train(**training_payload)   
+            filename = os.path.basename(training_result.model)
+            app.config.nlu.format['last_trained'] = filename
+            app.config.nlu.save_nlu()
+
     else:
-        with open(os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"), "wb") as download_file:
-            print("Downloading to",os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"))
-            download_file.write(blob_client.download_blob(f"{app.config.nlu.format['last_trained']}").readall())
-    
+        try:
+            with open(os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"), "wb") as download_file:
+                print("Downloading to",os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"))
+                download_file.write(blob_client.download_blob(f"{app.config.nlu.format['last_trained']}").readall())
+        except:
+                print("Cannot download ",app.config.nlu.format['last_trained']," model")
+                
     
     # Initialize shared object of type unsigned int for tracking
     # the number of active training processes
@@ -1478,11 +1503,17 @@ def create_app(
     async def load_model(request: Request) -> HTTPResponse:
         validate_request_body(request, "No path to model file defined in request_body.")
 
-        model_path = request.json.get("model_file", None)
-        model_server = request.json.get("model_server", None)
-        remote_storage = request.json.get("remote_storage", None)
+        model_path = None
+        remote_storage = None
+        model_server = None
+        if  "model_file" in request.json.keys():
+            model_path = request.json.get("model_file", None)
+            remote_storage = request.json.get("remote_storage", None)
+        else:
+            model_path = os.path.abspath(f"./models/{app.config.nlu.format.get('last_trained')}")
 
-        if model_server:
+        if "model_server" in request.json.keys():
+            model_server = request.json.get("model_server", None)
             try:
                 model_server = EndpointConfig.from_dict(model_server)
             except TypeError as e:
@@ -1718,7 +1749,16 @@ def create_app(
                 new_agent = await _load_agent(os.path.abspath(training_result.model))
                 new_agent.lock_store = app.ctx.agent.lock_store
                 app.ctx.agent = new_agent
-
+                blob_client = app.config.blob_service_client.get_blob_client(container="rasa-files", blob=f"{os.getenv('BOT_ID')}/{filename}")
+                
+                with open(os.path.abspath(training_result.model), "rb") as data:
+                    blob_client.upload_blob(data)
+                app.config.nlu.format['last_trained'] = filename
+                app.config.nlu.save_nlu()
+                blob_client = app.config.blob_service_client.get_blob_client(container="rasa-files", blob=f"{os.getenv('BOT_ID')}/config.json")
+                with open(os.path.abspath("./config.json"), "rb") as data:
+                    blob_client.upload_blob(data,overwrite=True)
+                    
                 return response.json(
                     # training_result.model,
                     body={"name":filename,
@@ -1814,6 +1854,14 @@ def create_app(
         app.config.nlu.set_pipeline(request.json['pipeline'])
         return response.text("PipeLine Updated")
     
+    @app.post("/purge_blob_storage")
+    def purge_blob_storage(request:Request)->HTTPResponse:
+        blob_client = blob_service_client.get_container_client(container= "rasa-files")
+        list_of_blobs = blob_client.list_blobs(name_starts_with=str(os.environ.get('BOT_ID')))
+        for blob in list_of_blobs:
+            blob_client.delete_blob(blob.get('name'),snapshot=None)
+        return response.json(list_of_blobs) 
+
     return app
 
 
