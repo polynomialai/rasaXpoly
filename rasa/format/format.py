@@ -8,7 +8,8 @@ from rasa.format.annotator import annotate_example,add_regex_annotation
 class nlu_format:
     def __init__(self) -> None:
         self.format = {
-          "name":"defaultName101",
+          "name":None,
+          "last_trained":None,
                             "pipeline": [
     {
       "name": "WhitespaceTokenizer"
@@ -157,7 +158,7 @@ class nlu_format:
           # for j in i['entities']:
           #   for k in j['synonyms']:
           #     arr.append(k)
-      return arr
+      return arr 
 
     def annotate(self,example, type="synonym"):
       if type == "synonym":

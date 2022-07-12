@@ -1402,6 +1402,8 @@ def create_app(
         #     "No text message defined in request_body. Add text message to request body "
         #     "in order to obtain the intent and extracted entities.",
         # )
+
+        
         emulation_mode = request.args.get("emulation_mode")
         emulator = _create_emulator(emulation_mode)
                     
@@ -1409,6 +1411,7 @@ def create_app(
             data = emulator.normalise_request_json(data)
             try:
                 parsed_data = await app.ctx.agent.parse_message(data.get("text"))
+                
             except Exception as e:
                 logger.debug(traceback.format_exc())
                 raise ErrorResponse(
@@ -1416,17 +1419,36 @@ def create_app(
                     "ParsingError",
                     f"An unexpected error occurred. Error: {e}",
                 )
+            try:
+                cer_data = {
+                        "query":data["text"],
+                        "threshold":50,
+                        "agent_name":"transo"
+                    }
+                cer_parsed_response = requests.post('http://lenskits.polynomial.ai/entityExtractor/hybrid',json=cer_data)
+                cer_parsed = cer_parsed_response.json()
+            except Exception as exe:
+                # cer_parsed = await requests.post('lenskits.polynomial.ai/entityExtractor/hybrid')
+                print(exe)
+                print("Not able to get custom entities")
+                cer_parsed={'entities':[]}
             response_data = emulator.normalise_response_json(parsed_data)
             app.config.logs_coll.insert_one({
                     "uuid":app.config.session_id+datetime.now().strftime("%m%d%Y%H%M%S"),
                     "query":request.json['queryInput']['text']['text'],
                     "result":response_data
                 })
+            
             intent_data = app.config.nlu.get_intent_by_name(response_data["intent"]["name"])
             stat = {}
             fields =  {}
+            
             for i in response_data['entities']:
                 fields[i["entity"]] = {"stringValue":i['value'] ,"kind":'stringValue'}
+            for i in cer_parsed['entities']:
+                if int(i['metaData']['match'])>75:
+                    fields[i["entityClass"]] = {"stringValue":i['token'] ,"kind":'stringValue'}
+
             if "trainingPhrases" in intent_data.keys():
                 training_phrases = intent_data["trainingPhrases"]
             else :
@@ -1758,7 +1780,7 @@ def create_app(
                 blob_client = app.config.blob_service_client.get_blob_client(container="rasa-files", blob=f"{os.getenv('BOT_ID')}/config.json")
                 with open(os.path.abspath("./config.json"), "rb") as data:
                     blob_client.upload_blob(data,overwrite=True)
-                    
+
                 return response.json(
                     # training_result.model,
                     body={"name":filename,
