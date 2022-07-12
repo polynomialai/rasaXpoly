@@ -699,11 +699,7 @@ def create_app(
             user_id="username",
         )
     app.config.nlu = nlu_format()
-    app.config.pass_ = "Prasad"
-    app.config.mongo = pymongo.MongoClient(f"mongodb+srv://Prasad:{app.config.pass_}@cluster0.sxofrx1.mongodb.net/?retryWrites=true&w=majority")
-    app.config.db = app.config.mongo['logs']
     app.config.agentName = app.config.nlu.get_name() 
-    app.config.logs_coll = app.config.db[app.config.agentName]
     app.config.session_id = "00000"
     connect_str = 'DefaultEndpointsProtocol=https;AccountName=aspectengineeringbackup;AccountKey=o0sdvUuxZtWm//m8LWWFUmGFbL45Lyrt1q9ohrH3MFUQROqcjk5bXFP4vjyWamqhV1Tdi2chktOi+ASt68UIiw==;EndpointSuffix=core.windows.net'
     app.config.blob_service_client = BlobServiceClient.from_connection_string(connect_str)
@@ -725,6 +721,11 @@ def create_app(
         os.remove("temp_config.json")
 
     app.config.nlu.load_nlu(filename="config.json") 
+
+    app.config.pass_ = "Prasad"
+    app.config.mongo = pymongo.MongoClient(f"mongodb+srv://Prasad:{app.config.pass_}@cluster0.sxofrx1.mongodb.net/?retryWrites=true&w=majority")
+    app.config.db = app.config.mongo['logs']
+    app.config.logs_coll = app.config.db[app.config.agentName]
 
     if app.config.nlu.format['last_trained']!='InitialModel.tar.gz':
         try:
