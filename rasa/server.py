@@ -716,7 +716,9 @@ def create_app(
         with open(os.path.abspath("./config.json"), "wb") as download_file:
             download_file.write(blob_client.download_blob(f"{os.getenv('BOT_ID')}/config.json").readall())
         os.remove("temp_config.json") 
-    except:
+    except Exception as err:
+        print(err)
+        raise err
         print("Cannot download config.json,using local version")
         with open("temp_config.json", "r") as input_json, open("config.json", "w") as to_json:
             to_json.write(input_json.read())
