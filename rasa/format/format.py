@@ -8,7 +8,7 @@ from rasa.format.annotator import annotate_example,add_regex_annotation
 class nlu_format:
     def __init__(self) -> None:
         self.format = {
-          "name":None,
+          "name":"default101",
           "last_trained":None,
                             "pipeline": [
     {
