@@ -1902,10 +1902,37 @@ def create_app(
 
     @app.get("/all_Data")
     def all_data(request:Request)->HTTPResponse:
-        return response.json(app.config.nlu.data())
+        try:
+            dic = requests.get('https://lenskits.polynomial.ai/entityExtractor/get_pack_names')
+            dic = dic.json()
+            data = app.config.nlu.data()
+            data['entities'].extend(dic['pack_names'])
+            return response.json(data)
+        except:
+            return response.json(app.config.nlu.data())
+
     @app.post("/list_entity_types")
     def list_entity_types(request:Request)->HTTPResponse:
-        return response.json(app.config.nlu.get_entities())
+        entity_list = app.config.nlu.get_entities()
+        try:
+            dic = requests.get('https://lenskits.polynomial.ai/entityExtractor/get_pack_names')
+            dic = dic.json()
+            pack_names = dic['pack_names']
+            for i in pack_names:
+                entity_list.append({
+                     "parent": f"projects/{os.environ.get('BOT_ID')}/agent",
+                     "entityType": {
+                                "displayName": f"{i}",
+                                "kind": "KIND_MAP",
+                                "name": f"projects/{os.environ.get('BOT_ID')}/agent/entityTypes/{uuid.uuid4()}",
+                                "entities": [],
+                                "updateMask": {}
+                            }
+                })
+            return response.json(entity_list)
+        except Exception as e:
+            print("Failed to get CER")
+            return response.json(entity_list)
 
     @app.post("/set_pipeline")
     def set_pipeline(request:Request)->HTTPResponse:
