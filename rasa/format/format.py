@@ -164,7 +164,7 @@ class nlu_format:
       if type == "synonym":
         for entity in self.format['nlu']:
           if entity["type"]=="entity":
-            if entity["kind"]=="KIND_MAP":
+            if entity["kind"]=="KIND_MAP" or entity["kind"]=="KIND_LIST":
               if self.get_examples(entity['displayName']):
                 i = self.get_examples(entity['displayName'])
                 for j in i['entities']:
@@ -279,6 +279,15 @@ class nlu_format:
           if i['displayName']==name_of_intent:
             return i
       return {}
+    
+    def get_entity_by_name(self,name_of_entity):
+      for i in self.format['nlu']:
+        if i['type']=='entity':
+          if i['displayName']==name_of_entity:
+            return i
+      return {}
+    
+    
     ## Legacy Code                 
     # def remove_entity_annotation(self,entity_str, example:str):
         
@@ -340,7 +349,7 @@ class nlu_format:
           for trainingPhrase in i['trainingPhrases']:
             example = ""
             for part in trainingPhrase["parts"]:
-              if part['entityType'] is "":
+              if 'entityType' not in part.keys() or  part['entityType'] is "":
                 text = self.annotate(part["text"])
                 text = self.annotate(text,type="regex")
               else:
@@ -353,7 +362,7 @@ class nlu_format:
           data = data[:-3]
           nlu_item['examples'] = data
         else:
-          if i['kind']=="KIND_MAP":
+          if i['kind']=="KIND_MAP" or i['kind']=="KIND_LIST":
             nlu_item['synonym'] = i['displayName']
           else:
             nlu_item['regex'] = i['displayName']

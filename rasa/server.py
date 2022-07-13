@@ -1425,7 +1425,7 @@ def create_app(
             try:
                 cer_data = {
                         "query":data["text"],
-                        "threshold":50,
+                        "threshold":80,
                         "agent_name":"transo"
                     }
                 cer_parsed_response = requests.post('http://lenskits.polynomial.ai/entityExtractor/hybrid',json=cer_data)
@@ -1445,12 +1445,35 @@ def create_app(
             intent_data = app.config.nlu.get_intent_by_name(response_data["intent"]["name"])
             stat = {}
             fields =  {}
-            
+            list_of_found_entities= set()
+
+            # for i in response_data['entities']:
+                # fields[i["entity"]] = {"stringValue":i['value'] ,"kind":'stringValue'}
+
             for i in response_data['entities']:
-                fields[i["entity"]] = {"stringValue":i['value'] ,"kind":'stringValue'}
+                list_of_found_entities.add(i['entity'])
+            for i in list_of_found_entities:
+                if app.config.nlu.get_entity_by_name(i)!={}:
+                    dic=app.config.nlu.get_entity_by_name(i)
+                    if dic['kind']=='KIND_LIST':
+                        fields[i]={"listValue":[],"kind":"'listValue'"}
+                    else :
+                        fields[i]={}
+            for i in response_data['entities']:
+                if app.config.nlu.get_entity_by_name(i['entity'])!={}:
+                    dic=app.config.nlu.get_entity_by_name(i['entity'])
+                    if dic['kind']=='KIND_LIST':
+                        fields[i['entity']]["listValue"].append({"stringValue":i['value'] ,"kind":'stringValue'})
+                    else :
+                        fields[i['entity']]={"stringValue":i['value'] ,"kind":'stringValue'}                    
+            for i in range(len(cer_parsed['entities'])):
+                for j in cer_parsed['relation']:
+                    if j['value']==cer_parsed['entities'][i]['token']:
+                        cer_parsed['entities'][i]['parentClass']=j['key']
+
             for i in cer_parsed['entities']:
-                if int(i['metaData']['match'])>75:
-                    fields[i["entityClass"]] = {"stringValue":i['token'] ,"kind":'stringValue'}
+                if int(i['metaData']['match'])>80:
+                    fields[i["parentClass"]] = {"stringValue":i['token'] ,"kind":'stringValue'}
 
             if "trainingPhrases" in intent_data.keys():
                 training_phrases = intent_data["trainingPhrases"]
@@ -1722,9 +1745,19 @@ def create_app(
                  data = []
             trainingPhrases = []
             for single_intent in data:
+                # print(single_intent)
+                temp_single_intent = single_intent['data'] 
+                for part_num in range(len(temp_single_intent)):
+                    if temp_single_intent[part_num]['userDefined']:
+                        if 'alias' in temp_single_intent[part_num].keys():
+                            temp_single_intent[part_num]['entityType']=temp_single_intent[part_num]['alias']
+                    else:
+                        temp_single_intent[part_num]['entityType']=''
+                    print(temp_single_intent[part_num])
+                single_intent['data'] = temp_single_intent
                 trainingPhrases.append({
                     "type": 'EXAMPLE',
-                    "parts": [{"text": single_intent['data'][0]['text'], "alias": '', "userDefined": False, "entityType": '' }]
+                    "parts": single_intent['data']
                     })
             intent= {
             "name": intent_name,
