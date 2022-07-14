@@ -715,7 +715,7 @@ def create_app(
         os.remove("temp_config.json") 
     except Exception as err:
         print(err)
-        raise err
+        # raise err
         print("Cannot download config.json,using local version")
         with open("temp_config.json", "r") as input_json, open("config.json", "w") as to_json:
             to_json.write(input_json.read())
@@ -1754,7 +1754,7 @@ def create_app(
                             temp_single_intent[part_num]['entityType']=temp_single_intent[part_num]['alias']
                     else:
                         temp_single_intent[part_num]['entityType']=''
-                    print(temp_single_intent[part_num])
+                    # print(temp_single_intent[part_num])
                 single_intent['data'] = temp_single_intent
                 trainingPhrases.append({
                     "type": 'EXAMPLE',
@@ -1907,10 +1907,7 @@ def create_app(
             dic = requests.get('https://lenskits.polynomial.ai/entityExtractor/get_pack_names')
             dic = dic.json()
             data = copy.deepcopy(app.config.nlu.data())
-            print(data['entities'])
-            print(len(data['entities']))
             data['entities'].extend(dic['pack_names'])
-            print(len(data['entities']))
             return response.json(data)
         except:
             return response.json(app.config.nlu.data())
