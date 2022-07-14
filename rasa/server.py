@@ -32,6 +32,7 @@ from datetime import datetime
 import json
 from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
 
+import copy
 import requests
 import aiohttp
 import jsonschema
@@ -1905,29 +1906,32 @@ def create_app(
         try:
             dic = requests.get('https://lenskits.polynomial.ai/entityExtractor/get_pack_names')
             dic = dic.json()
-            data = app.config.nlu.data()
+            data = copy.deepcopy(app.config.nlu.data())
+            print(data['entities'])
+            print(len(data['entities']))
             data['entities'].extend(dic['pack_names'])
+            print(len(data['entities']))
             return response.json(data)
         except:
             return response.json(app.config.nlu.data())
 
     @app.post("/list_entity_types")
     def list_entity_types(request:Request)->HTTPResponse:
-        entity_list = app.config.nlu.get_entities()
+        entity_list = [i for i in app.config.nlu.get_entities()]
         try:
             dic = requests.get('https://lenskits.polynomial.ai/entityExtractor/get_pack_names')
             dic = dic.json()
             pack_names = dic['pack_names']
             for i in pack_names:
-                entity_list.append({
-                     "parent": f"projects/{os.environ.get('BOT_ID')}/agent",
-                     "entityType": {
+                entity_list.append(
+                     {
                                 "displayName": f"{i}",
                                 "kind": "KIND_MAP",
                                 "name": f"projects/{os.environ.get('BOT_ID')}/agent/entityTypes/{uuid.uuid4()}",
                                 "entities": [],
-                                "updateMask": {}
-                            }
+                                'autoExpansionMode':"AUTO_EXPANSION_MODE_UNSPECIFIED",
+                                'enableFuzzyExtraction':False
+                            
                 })
             return response.json(entity_list)
         except Exception as e:
