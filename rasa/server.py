@@ -720,13 +720,14 @@ def create_app(
         with open("temp_config.json", "r") as input_json, open("config.json", "w") as to_json:
             to_json.write(input_json.read())
         os.remove("temp_config.json")
-
     app.config.nlu.load_nlu(filename="config.json") 
-
-    app.config.pass_ = "Prasad"
-    app.config.mongo = pymongo.MongoClient(f"mongodb+srv://Prasad:{app.config.pass_}@cluster0.sxofrx1.mongodb.net/?retryWrites=true&w=majority")
-    app.config.db = app.config.mongo['logs']
-    app.config.logs_coll = app.config.db[app.config.agentName]
+    try:
+        app.config.mongo = pymongo.MongoClient(os.environ.get('DB_CONN_STR'))
+        app.config.db = app.config.mongo['logs']
+        app.config.logs_coll = app.config.db[app.config.agentName]
+    except Exception as e:
+        print("Could not connect to database")
+        print("Error: ",e)
 
     if app.config.nlu.format['last_trained']!='InitialModel.tar.gz':
         try:
@@ -1432,17 +1433,19 @@ def create_app(
                 cer_parsed_response = requests.post('http://lenskits.polynomial.ai/entityExtractor/hybrid',json=cer_data)
                 cer_parsed = cer_parsed_response.json()
             except Exception as exe:
-                # cer_parsed = await requests.post('lenskits.polynomial.ai/entityExtractor/hybrid')
-                print(exe)
                 print("Not able to get custom entities")
+                print(exe)
                 cer_parsed={'entities':[]}
             response_data = emulator.normalise_response_json(parsed_data)
-            app.config.logs_coll.insert_one({
+            try:
+                app.config.logs_coll.insert_one({
                     "uuid":app.config.session_id+datetime.now().strftime("%m%d%Y%H%M%S"),
                     "query":request.json['queryInput']['text']['text'],
                     "result":response_data
-                })
-            
+                    })
+            except Exception as e:
+                print("Could insert into Database ,Error: ",e)
+
             intent_data = app.config.nlu.get_intent_by_name(response_data["intent"]["name"])
             stat = {}
             fields =  {}
