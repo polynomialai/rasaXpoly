@@ -152,18 +152,39 @@ class nlu_format:
       return arr 
 
     def annotate(self,example, type="synonym"):
+      if len(example)==0:
+        return ""
+      example = " "+example+" "
       if type == "synonym":
+        org_example = example
+        annotated_example = example
+        list_of_all_entities=[]
         for entity in self.format['nlu']:
           if entity["type"]=="entity":
+            # print(entity)
             if entity["kind"]=="KIND_MAP" or entity["kind"]=="KIND_LIST":
               if self.get_examples(entity['displayName']):
                 i = self.get_examples(entity['displayName'])
                 for j in i['entities']:
-                  for k in sorted(j['synonyms'],key=len,reverse=True):
-                    if k in example.lower().split() or (k in example and len(k.split())>1 )and( len(re.findall(r'\[.*\]\{.*\}', example))==0) :
-                      example = annotate_example(example, k , entity['displayName'], j['value'])
-                      return example
-        return example
+                  for k in j['synonyms']:
+                    list_of_all_entities.append({
+                      'text':k.lower(),
+                      'entity':entity['displayName'],
+                      'value': j['value']
+                    })
+        list_of_all_entities.sort(key=lambda x:len(x['text']),reverse=True)                       
+        for i in list_of_all_entities:
+          mat =re.search(' '+i['text'].lower(), example.lower())
+          if mat is not None: 
+            l = mat.span()[0]
+            r = mat.span()[1]
+            entity = i['entity']
+            value = i['value'] 
+            example = self.annotate(example[:l])+f' [{example[l+1:r]}]{{"entity":"{entity}","value":"{value}"}} ' + self.annotate(example[r:])
+            # print(example)
+            break
+
+        return example.strip()
 
       if type == "regex":
         regex_list = []

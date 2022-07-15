@@ -707,36 +707,36 @@ def create_app(
     
     blob_client = app.config.blob_service_client.get_container_client(container= "rasa-files")
     try:
-        print(f"Downloading {os.getenv('BOT_ID')}/config.json")
+        logger.debug(f"Downloading {os.getenv('BOT_ID')}/config.json")
         with open("config.json", "r") as input_json, open("temp_config.json", "w") as to_json:
             to_json.write(input_json.read())
         with open(os.path.abspath("./config.json"), "wb") as download_file:
             download_file.write(blob_client.download_blob(f"{os.getenv('BOT_ID')}/config.json").readall())
         os.remove("temp_config.json") 
     except Exception as err:
-        print(err)
-        # raise err
-        print("Cannot download config.json,using local version")
+        logger.error(err)
+        logger.error("Cannot download config.json,using local version")
         with open("temp_config.json", "r") as input_json, open("config.json", "w") as to_json:
             to_json.write(input_json.read())
         os.remove("temp_config.json")
     app.config.nlu.load_nlu(filename="config.json") 
     try:
-        app.config.mongo = pymongo.MongoClient(os.environ.get('DB_CONN_STR'))
+        app.config.mongo = pymongo.MongoClient(os.getenv('DB_CONN_STR'))
         app.config.db = app.config.mongo['logs']
-        app.config.logs_coll = app.config.db[os.enviorn.get('BOT_ID')]
+        app.config.logs_coll = app.config.db[os.getenv('BOT_ID')]
+        logger.debug("Connected to Database")
     except Exception as e:
-        print("Could not connect to database")
-        print("Error: ",e)
+        logger.error("Could not connect to database")
+        logger.error(e)
 
     if app.config.nlu.format['last_trained']!='InitialModel.tar.gz':
         try:
-            print("Downloading model",app.config.nlu.format['last_trained'])
+            logger.debug("Downloading model",app.config.nlu.format['last_trained'])
             with open(os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"), "wb") as download_file:
-                print("Downloading to",os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"))
+                logger.debug("Downloading to",os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"))
                 download_file.write(blob_client.download_blob(f"{os.getenv('BOT_ID')}/{app.config.nlu.format['last_trained']}").readall())
-        except:
-            print("Cannot download initial model\n training from scratch")
+        except Exception as e:
+            logger.error("Cannot download initial model\n training from scratch",e)
             from rasa.model_training import train
             if not os.path.exists("./tmp"):
                 os.makedirs("./tmp")
@@ -749,10 +749,10 @@ def create_app(
     else:
         try:
             with open(os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"), "wb") as download_file:
-                print("Downloading to",os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"))
+                logger.debug("Downloading to",os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"))
                 download_file.write(blob_client.download_blob(f"{app.config.nlu.format['last_trained']}").readall())
         except:
-                print("Cannot download ",app.config.nlu.format['last_trained']," model")
+                logger.error("Cannot download ",app.config.nlu.format['last_trained']," model")
                 
     
     # Initialize shared object of type unsigned int for tracking
@@ -1433,8 +1433,8 @@ def create_app(
                 cer_parsed_response = requests.post('http://lenskits.polynomial.ai/entityExtractor/hybrid',json=cer_data)
                 cer_parsed = cer_parsed_response.json()
             except Exception as exe:
-                print("Not able to get custom entities")
-                print(exe)
+                logger.error("Not able to get custom entities")
+                logger.error(exe)
                 cer_parsed={'entities':[]}
             response_data = emulator.normalise_response_json(parsed_data)
             try:
@@ -1444,7 +1444,7 @@ def create_app(
                     "result":response_data
                     })
             except Exception as e:
-                print("Could insert into Database ,Error: ",e)
+                logger.error("Could insert into Database ,Error: ",e)
 
             intent_data = app.config.nlu.get_intent_by_name(response_data["intent"]["name"])
             stat = {}
@@ -1635,6 +1635,10 @@ def create_app(
         stat = app.config.nlu.create_intent(data['displayName'])
         # stat['name']=stat['uuid']
         app.config.nlu.save_nlu()
+        blob_client = app.config.blob_service_client.get_blob_client(container="rasa-files", blob=f"{os.getenv('BOT_ID')}/config.json")
+        with open(os.path.abspath("./config.json"), "rb") as data:
+            blob_client.upload_blob(data,overwrite=True)
+
         stat['inputContextNames']=[]
         stat["events"]= []
         stat["outputContexts"] = []
@@ -1655,6 +1659,10 @@ def create_app(
     def update_intent(request:Request)->HTTPResponse:
         stat = app.config.nlu.update_intent(request.json['intent'])
         app.config.nlu.save_nlu()
+        blob_client = app.config.blob_service_client.get_blob_client(container="rasa-files", blob=f"{os.getenv('BOT_ID')}/config.json")
+        with open(os.path.abspath("./config.json"), "rb") as data:
+            blob_client.upload_blob(data,overwrite=True)
+
         stat['inputContextNames']=[]
         stat["events"]= []
         stat["outputContexts"] = []
@@ -1677,12 +1685,20 @@ def create_app(
         name = data['name']
         app.config.nlu.delete_intent(name)
         app.config.nlu.save_nlu()
+        blob_client = app.config.blob_service_client.get_blob_client(container="rasa-files", blob=f"{os.getenv('BOT_ID')}/config.json")
+        with open(os.path.abspath("./config.json"), "rb") as data:
+            blob_client.upload_blob(data,overwrite=True)
+
         return response.json([{},None,None])
 
     @app.post("/clean_nlu")
     def clean_nlu(request:Request)->HTTPResponse:
         app.config.nlu.purge_nlu()
         app.config.nlu.save_nlu()
+        blob_client = app.config.blob_service_client.get_blob_client(container="rasa-files", blob=f"{os.getenv('BOT_ID')}/config.json")
+        with open(os.path.abspath("./config.json"), "rb") as data:
+            blob_client.upload_blob(data,overwrite=True)
+
         return response.text("Cleaned NLU Successfully")
         
     @app.post("/add_regex")
@@ -1698,6 +1714,10 @@ def create_app(
         data = request.json
         stat = app.config.nlu.add_entity(data['entityType'])
         app.config.nlu.save_nlu()
+        blob_client = app.config.blob_service_client.get_blob_client(container="rasa-files", blob=f"{os.getenv('BOT_ID')}/config.json")
+        with open(os.path.abspath("./config.json"), "rb") as data:
+            blob_client.upload_blob(data,overwrite=True)
+
         stat['autoExpansionMode']="AUTO_EXPANSION_MODE_UNSPECIFIED"
         stat["enableFuzzyExtraction"]=False
         return response.json([stat,None,None])
@@ -1706,6 +1726,10 @@ def create_app(
     def update_entity(request:Request)->HTTPResponse:
         stat = app.config.nlu.update_entity(request.json['entityType'])
         app.config.nlu.save_nlu()
+        blob_client = app.config.blob_service_client.get_blob_client(container="rasa-files", blob=f"{os.getenv('BOT_ID')}/config.json")
+        with open(os.path.abspath("./config.json"), "rb") as data:
+            blob_client.upload_blob(data,overwrite=True)
+
         stat['autoExpansionMode']="AUTO_EXPANSION_MODE_UNSPECIFIED"
         stat["enableFuzzyExtraction"]=False
         return response.json([stat,None,None])
@@ -1721,6 +1745,11 @@ def create_app(
     @app.post("/delete_entity")
     def delete_entity(request:Request)->HTTPResponse:
         app.config.nlu.delete_entity(request.json['name'])
+        app.config.nlu.save_nlu()
+        blob_client = app.config.blob_service_client.get_blob_client(container="rasa-files", blob=f"{os.getenv('BOT_ID')}/config.json")
+        with open(os.path.abspath("./config.json"), "rb") as data:
+            blob_client.upload_blob(data,overwrite=True)
+
         return response.json([{},None,None])
     
     @app.post("/agent_path")
@@ -1749,7 +1778,6 @@ def create_app(
                  data = []
             trainingPhrases = []
             for single_intent in data:
-                # print(single_intent)
                 temp_single_intent = single_intent['data'] 
                 for part_num in range(len(temp_single_intent)):
                     if temp_single_intent[part_num]['userDefined']:
@@ -1757,7 +1785,6 @@ def create_app(
                             temp_single_intent[part_num]['entityType']=temp_single_intent[part_num]['alias']
                     else:
                         temp_single_intent[part_num]['entityType']=''
-                    # print(temp_single_intent[part_num])
                 single_intent['data'] = temp_single_intent
                 trainingPhrases.append({
                     "type": 'EXAMPLE',
@@ -1879,7 +1906,7 @@ def create_app(
         return response.json([
                                     {
                                        "supportedLanguageCodes": [ 'en-in' ],
-                                        "parent": f'projects/{os.enviorn("BOT_ID")}',
+                                        "parent": f'projects/{os.getenv("BOT_ID")}',
                                         "displayName": 'colive-classifer-1',
                                         "defaultLanguageCode": 'en',
                                         "timeZone": 'Asia/Almaty',
@@ -1927,7 +1954,7 @@ def create_app(
                      {
                                 "displayName": f"{i}",
                                 "kind": "KIND_MAP",
-                                "name": f"projects/{os.environ.get('BOT_ID')}/agent/entityTypes/{uuid.uuid4()}",
+                                "name": f"projects/{os.getenv('BOT_ID')}/agent/entityTypes/{uuid.uuid4()}",
                                 "entities": [],
                                 'autoExpansionMode':"AUTO_EXPANSION_MODE_UNSPECIFIED",
                                 'enableFuzzyExtraction':False
@@ -1935,7 +1962,7 @@ def create_app(
                 })
             return response.json(entity_list)
         except Exception as e:
-            print("Failed to get CER")
+            logger.error("Failed to get CER")
             return response.json(entity_list)
 
     @app.post("/set_pipeline")
@@ -1946,7 +1973,7 @@ def create_app(
     @app.post("/purge_blob_storage")
     def purge_blob_storage(request:Request)->HTTPResponse:
         blob_client = blob_service_client.get_container_client(container= "rasa-files")
-        list_of_blobs = blob_client.list_blobs(name_starts_with=str(os.environ.get('BOT_ID')))
+        list_of_blobs = blob_client.list_blobs(name_starts_with=str(os.getenv('BOT_ID')))
         for blob in list_of_blobs:
             blob_client.delete_blob(blob.get('name'),snapshot=None)
         return response.json(list_of_blobs) 
