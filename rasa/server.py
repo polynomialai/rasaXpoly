@@ -724,7 +724,7 @@ def create_app(
     try:
         app.config.mongo = pymongo.MongoClient(os.environ.get('DB_CONN_STR'))
         app.config.db = app.config.mongo['logs']
-        app.config.logs_coll = app.config.db[app.config.agentName]
+        app.config.logs_coll = app.config.db[os.enviorn.get('BOT_ID')]
     except Exception as e:
         print("Could not connect to database")
         print("Error: ",e)
