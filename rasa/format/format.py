@@ -353,9 +353,9 @@ class nlu_format:
       training_data['session_config'] = self.format['session_config']
       training_data['nlu'] = []
       for i in self.format['nlu']:
-        nlu_item={}
         dic = {}
         if i['type']=="intent":
+          nlu_item={}
           nlu_item['intent'] = i['displayName']
           data ="- "
           for trainingPhrase in i['trainingPhrases']:
@@ -366,25 +366,35 @@ class nlu_format:
                 text = self.annotate(text,type="regex")
               else:
                 # text = annotate_example(part["text"],part["text"], part['entityType'], part['entityType'])
-                text = self.annotate(part["text"])
-                text = self.annotate(text,type="regex")
+                text = self.annotate(part["text"].lower())
+                text = self.annotate(text.lower(),type="regex")
               example+=text
 
             data = data + example +"\n- "
           data = data[:-3]
           nlu_item['examples'] = data
+          training_data['nlu'].append(nlu_item)
         else:
           if i['kind']=="KIND_MAP" or i['kind']=="KIND_LIST":
-            nlu_item['synonym'] = i['displayName']
+            for example in i['entities']:
+              nlu_item={}
+              nlu_item['synonym'] = example['value']
+              data = "- "
+              for j in example['synonyms']:
+                data = data + j + "\n- "
+              data = data[:-3]
+              nlu_item['examples'] = data
+              training_data['nlu'].append(nlu_item)
           else:
+            nlu_item={}
             nlu_item['regex'] = i['displayName']
-          data = "- "
-          for example in i['entities']:
-            for j in example['synonyms']:
-              data = data + j + "\n- "
-          data = data[:-3]
-          nlu_item['examples'] = data
-        training_data['nlu'].append(nlu_item)
+            data = "- "
+            for example in i['entities']:
+              for j in example['synonyms']:
+                data = data + j + "\n- "
+            data = data[:-3]
+            nlu_item['examples'] = data
+            training_data['nlu'].append(nlu_item)
       return training_data
 
     def delete_regex(self,regex_name: str):    

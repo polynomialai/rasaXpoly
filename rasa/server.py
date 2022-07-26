@@ -724,16 +724,16 @@ def create_app(
         app.config.mongo = pymongo.MongoClient(os.getenv('DB_CONN_STR'))
         app.config.db = app.config.mongo['logs']
         app.config.logs_coll = app.config.db[os.getenv('BOT_ID')]
-        logger.debug("Connected to Database")
+        logger.info("Connected to Database")
     except Exception as e:
-        logger.error("Could not connect to database")
-        logger.error(e)
+        print("Could not connect to database")
+        print(e)
 
     if app.config.nlu.format['last_trained']!='InitialModel.tar.gz':
         try:
-            logger.debug("Downloading model",app.config.nlu.format['last_trained'])
+            logger.info("Downloading model",app.config.nlu.format['last_trained'])
             with open(os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"), "wb") as download_file:
-                logger.debug("Downloading to",os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"))
+                logger.info("Downloading to",os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"))
                 download_file.write(blob_client.download_blob(f"{os.getenv('BOT_ID')}/{app.config.nlu.format['last_trained']}").readall())
         except Exception as e:
             logger.error("Cannot download initial model\n training from scratch",e)
@@ -749,10 +749,10 @@ def create_app(
     else:
         try:
             with open(os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"), "wb") as download_file:
-                logger.debug("Downloading to",os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"))
+                logger.info("Downloading to",os.path.abspath(f"./models/{app.config.nlu.format['last_trained']}"))
                 download_file.write(blob_client.download_blob(f"{app.config.nlu.format['last_trained']}").readall())
         except:
-                logger.error("Cannot download ",app.config.nlu.format['last_trained']," model")
+                logger.info("Cannot download ",app.config.nlu.format['last_trained']," model")
                 
     
     # Initialize shared object of type unsigned int for tracking
@@ -1437,6 +1437,7 @@ def create_app(
                 logger.error(exe)
                 cer_parsed={'entities':[]}
             response_data = emulator.normalise_response_json(parsed_data)
+            print(response_data)
             try:
                 app.config.logs_coll.insert_one({
                     "uuid":app.config.session_id+datetime.now().strftime("%m%d%Y%H%M%S"),
@@ -1445,6 +1446,8 @@ def create_app(
                     })
             except Exception as e:
                 logger.error("Could insert into Database ,Error: ",e)
+            if response_data["intent"]["name"]=='nlu_fallback':
+                response_data["intent"]["name"]='Default Fallback Intent'
 
             intent_data = app.config.nlu.get_intent_by_name(response_data["intent"]["name"])
             stat = {}
