@@ -1437,7 +1437,7 @@ def create_app(
                 logger.error(exe)
                 cer_parsed={'entities':[]}
             response_data = emulator.normalise_response_json(parsed_data)
-            print(response_data)
+            logger.info(data["text"],response_data)
             try:
                 app.config.logs_coll.insert_one({
                     "uuid":app.config.session_id+datetime.now().strftime("%m%d%Y%H%M%S"),
@@ -1450,6 +1450,7 @@ def create_app(
                 response_data["intent"]["name"]='Default Fallback Intent'
 
             intent_data = app.config.nlu.get_intent_by_name(response_data["intent"]["name"])
+            logger.info(data["text"],intent_data)
             stat = {}
             fields =  {}
             list_of_found_entities= set()
