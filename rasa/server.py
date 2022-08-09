@@ -1438,6 +1438,7 @@ def create_app(
                 cer_parsed={'entities':[]}
             response_data = emulator.normalise_response_json(parsed_data)
             logger.info(data["text"],response_data)
+            logger.info(response_data)
             try:
                 app.config.logs_coll.insert_one({
                     "uuid":app.config.session_id+datetime.now().strftime("%m%d%Y%H%M%S"),
@@ -1447,10 +1448,12 @@ def create_app(
             except Exception as e:
                 logger.error("Could insert into Database ,Error: ",e)
             if response_data["intent"]["name"]=='nlu_fallback':
+                logger.info(response_data, "check")
                 response_data["intent"]["name"]='Default Fallback Intent'
 
             intent_data = app.config.nlu.get_intent_by_name(response_data["intent"]["name"])
             logger.info(data["text"],intent_data)
+            logger.info(intent_data)
             stat = {}
             fields =  {}
             list_of_found_entities= set()
