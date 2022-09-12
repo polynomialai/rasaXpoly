@@ -1447,9 +1447,15 @@ def create_app(
                     })
             except Exception as e:
                 logger.error("Could insert into Database ,Error: ",e)
+            
+            fallback_flag = False
             if response_data["intent"]["name"]=='nlu_fallback':
+                fallback_flag = True
                 logger.info(response_data, "check")
-                response_data["intent"]["name"]='Default Fallback Intent'
+                if len(response_data["intent_ranking"])>1:
+                    response_data["intent"] = response_data["intent_ranking"][1]
+                else:
+                    response_data["intent"]["name"]='Default Fallback Intent'
 
             intent_data = app.config.nlu.get_intent_by_name(response_data["intent"]["name"])
             logger.info(data["text"],intent_data)
@@ -1528,7 +1534,7 @@ def create_app(
                             "name": intent_data["name"], 
                             "displayName": response_data["intent"]["name"],
                             "priority": 0,
-                            "isFallback": False,
+                            "isFallback": fallback_flag,
                             "webhookState": 'WEBHOOK_STATE_UNSPECIFIED',
                             "action": '',
                             "resetContexts": False,
